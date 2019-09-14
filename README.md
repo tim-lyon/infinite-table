@@ -22,11 +22,11 @@ For basic usage you can bind a 2D array of [field values](#fieldValues) to the `
 ```html
 <infinite-table v-model="myData"/>
 ```
-Alternatively, we can bind to a 'data API' object, allowing a field's data to be fetched only when required. When the size of the table gets very large, this approach can help maintain high performing table by only keeping the visible data in memory.
+Alternatively, we can bind to a 'data interface' object, allowing a field's data to be fetched only when required. When the size of the table gets very large, this approach can help maintain high performing table by only keeping the visible data in memory.
 ```html
-<infinite-table :data-api="myDataApi"/>
+<infinite-table :data-interface="myDataInterface"/>
 ```
-Where `myDataApi` is an object with the following properties
+Where `myDataInterface` is an object with the following properties
 |Property|Type|Description|
 |---|---|---|---|
 |`count`|Number|The number of data records/rows in the table
@@ -39,8 +39,12 @@ Where `myDataApi` is an object with the following properties
 Each cell in an `infinite-table` is populated using a 'field value' which can be provided either as the value primitive or as an object with required `value` property and optional overrides of the column's `type`, `options`, `required` and/or `disabled` parameters.
 
 ## Headers
-The `headers` prop allows the column headers (and associated field's attributes) to be customised.
+The `headers` prop allows column headers (and associated field's attributes) to be added and customised.
 ```html
+<!-- default headers (A, B, C...) -->
+<infinite-table headers />
+
+<!-- custom headers -->
 <infinite-table :headers="myHeaders" />
 ```
 Where `myHeaders` is an array of header objects following the schema below.<br> All properties are optional.
@@ -70,7 +74,7 @@ If a field has an associated `options` property (either directly, or inherited f
 An array of validation functions can be provided in the `headers` (or overriden in a field value). On change of a field's value, each of the validator functions will be called in sequence with the proposed value as the only parameter. If any of the validatos return `false` then the `infinite-table` will not mutate the value/emit a change event.
 
 ## Events
-The `infinite-table` component will emit the following events which, if subscribed to, will override the default implementation. This can be useful for large datasets where the (potentially many) required calls to the data api's `get` and `set` methods could become expensive.
+The `infinite-table` component will emit the following events which, if subscribed to, will override the default implementation. This can be useful for large datasets where the (potentially many) required calls to the data interface's `get` and `set` methods could become expensive.
 |Event name|Payload|
 |---|---|
 |`copy`|Selected range `{start: {row:#, column:#}, end: {row:#, column:#}}`

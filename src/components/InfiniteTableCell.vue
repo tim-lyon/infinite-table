@@ -2,7 +2,7 @@
   <div class="cell"
   @mousedown="$emit('cellMouseDown')"
   @mouseover="$emit('cellMouseOver')">
-    <input class="cell" v-model="cellData"/>
+    <input class="cell" :value="value" @input="$emit('input', $event.target.value)"/>
   </div>
 </template>
 
@@ -10,7 +10,7 @@
 
 export default {
   name: 'InfiniteTableCell',
-  props: ['cellData']
+  props: ['value']
 }
 </script>
 
