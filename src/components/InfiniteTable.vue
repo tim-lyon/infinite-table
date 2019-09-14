@@ -1,7 +1,7 @@
 <template>
   <div class="table-container" tabindex="1" @keydown="OnTableKeypress">
     <InfiniteTableHeaders
-      :headers="headers"
+      :headers="headers_"
       :selectedColumns="selectedColumns"
       @selectColumnRange="selectColumns"
     />
@@ -9,25 +9,30 @@
       <div :style="{height: totalHeight+'px'}">
         <div :style="{position:'relative', top:topBufferHeight+'px'}">
           <InfiniteTableRow
-          v-for="i in renderedRows"
+          v-for="i in renderedRowCount"
           :index="i+startRow"
           :style="{background: (i+startRow)%2 ? 'rgba(0,0,0,0.05)' : ''}"
+          @input="setData($event, i+startRow)"
           @cellMouseDown="onCellMouseDown"
           @cellMouseOver="onCellMouseOver"
           @rowMouseDown="onRowMouseDown(i+startRow)"
           @rowMouseOver="onRowMouseOver(i+startRow)"
-          :rowData="dataGetter(startRow+i)" 
+          @created="getRowData(i+startRow)"
+          :data="isDataInterface ? rowData[i+startRow] ? rowData[i+startRow] : ['...'] : getRowData(i+startRow)" 
           :key="i+startRow" />
-
           <div :style="underlayStyle"></div>
         </div>
       </div>
       
     </div>
-    Jump to row <input type=number ref="rowJumpInput" @keypress.enter="jumpRow">
-    <button @click="jumpRow">go</button>
+    <div>
+      <button v-for="(exportFunction, name) in computedExports" :key="name" @click="startExport(exportFunction)">
+        Export {{name}}
+      </button>
+    </div>
 
     <br><br>Selection: {{selection}}
+    <br>
   </div>
 
 </template>
@@ -46,8 +51,105 @@ export default {
     InfiniteTableHeaders,
     InfiniteTableRow
   },
-  props: ['headers', 'rowCount', 'dataGetter'],
+  props: {
+    headers: {
+      required: false
+    },
+    dataInterface: {
+      type: Object,
+      required: false
+    },
+    value: {
+      type: Array,
+      required: false
+    },
+    exports: {
+      required: false
+    }
+  },
+  mounted(){
+    this.computeHeaders()
+  },
   methods: {
+    getRowData(iRow) {
+      if(!this.isDataInterface){
+        return this.value[iRow-1]
+      }
+      return new Promise(resolve => {
+        this.dataInterface.get(iRow).then(rowData=>{
+          this.$set(this.rowData, iRow, rowData)
+          resolve()
+        })
+      })
+    },
+    computeHeaders() {
+      if(Array.isArray(this.headers) || this.headers === undefined){
+        this.headers_ = this.headers
+      }
+      else if(!this.isDataInterface) {
+        this.headers_ = this.value[0].map((cell, iCol) => {
+          return {name: this.defaultColumnName(iCol+1)}
+        })
+      }
+      else{
+        this.dataInterface.get(1).then(row=>{
+          var data = row.map((cell, iCol) => {
+            return {name: this.defaultColumnName(iCol+1)}
+          })
+          this.headers_ = data
+        })
+      }
+    },
+    startExport(exportFunction){
+      this.getAllData().then(()=>{
+        exportFunction()
+      })
+    },
+    getAllData(){
+      var promises = []
+      for(var iRow = 1; iRow <= this.dataInterface.count; iRow++){
+        promises.push(this.getRowData(iRow))
+      }
+      return Promise.all(promises)
+    },
+    exportCSV(){
+      let csvFile = "data:text/csv;charset=utf-8,";
+      for(var iRow = 1; iRow <= this.rowCount; iRow++){
+        const rowArray = this.rowData[iRow].map(fieldValue => {
+          var value = fieldValue.hasOwnProperty('value') ? fieldValue.value : fieldValue
+          var string = value.toString().replace(/"/g, '""')
+          if (string.search(/("|,|\n)/g) >= 0){
+            string = '"' + string + '"'
+          }
+          return string
+        })
+        csvFile += rowArray.join(",") + "\r\n";
+      }
+      var blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", "export.csv");
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    },
+    setData(data, row){
+      if(this.isDataInterface){
+        this.dataInterface.set(row, data.column, data.value)
+      }
+      else{
+        this.$set(this.value[row-1], data.column, data.value)
+        this.$emit('input', this.value)
+      }
+    },
+    defaultColumnName(iCol) {
+      for (var ret = '', a = 1, b = 26; (iCol -= a) >= 0; a = b, b *= 26) {
+        ret = String.fromCharCode(parseInt((iCol % b) / a) + 65) + ret;
+      }
+      return ret;
+    },
     OnTableKeypress(){
       switch(event.key){
         case 'ArrowDown':
@@ -84,12 +186,6 @@ export default {
         this.$refs.body.scrollTop = this.referenceRow.scrollTop +
                 (iRow-this.referenceRow.row-offset)*ROW_HEIGHT
       }
-    },
-    jumpRow(){
-      const row = this.$refs.rowJumpInput.value
-      this.selection.start.R = row
-      this.selection.end.R = row
-      this.scrollToRow(this.selection.end.R)
     },
     OnArrow(dx, dy){
       if(event.shiftKey){
@@ -207,11 +303,12 @@ export default {
   },
   data(){
     return {
+      headers_: undefined,
+      rowData: {},
       referenceRow: {row: 0, scrollTop: 0},
       lastScrollTop: 0,
       renderedRows: ROW_COUNT+2*BUFFER_ROWS,
       startRow: 0,
-      totalHeight: Math.min(MAX_ROWS, this.rowCount)*ROW_HEIGHT,
       topBufferHeight: 0,
       contentHeight: ROW_COUNT*ROW_HEIGHT,
 
@@ -228,6 +325,22 @@ export default {
     }
   },
   computed: {
+    isDataInterface(){
+      return this.dataInterface !== undefined
+    },
+    computedExports(){
+      return Array.isArray(this.exports) || this.exports === undefined ?
+      this.exports : {CSV: this.exportCSV}
+    },
+    rowCount() {
+      return this.isDataInterface ? this.dataInterface.count : this.value.length
+    },
+    renderedRowCount() {
+      return Math.min(this.renderedRows, this.rowCount - this.startRow)
+    },
+    totalHeight() {
+      return Math.min(MAX_ROWS, this.rowCount)*ROW_HEIGHT
+    },
     selectedColumns(){
       if(Math.abs(this.selection.start.R -
       this.selection.end.R) == this.rowCount-1){

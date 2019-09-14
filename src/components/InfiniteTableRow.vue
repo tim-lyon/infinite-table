@@ -3,11 +3,14 @@
     @mousedown="$emit('rowMouseDown')"
     @mouseover="$emit('rowMouseOver')"
   >
-    <InfiniteTableCell v-for="(cell, iCol) of rowData"
-    :cellData="cell"
-    @cellMouseDown="$emit('cellMouseDown', iCol)"
-    @cellMouseOver="$emit('cellMouseOver', iCol)"
-    :key="iCol"/>
+    <InfiniteTableCell
+      v-for="(cell, iCol) of data"
+      :value="cell"
+      @input="emitValue($event, iCol)"
+      @cellMouseDown="$emit('cellMouseDown', iCol)"
+      @cellMouseOver="$emit('cellMouseOver', iCol)"
+      :key="iCol"
+    />
   </div>
 </template>
 
@@ -16,10 +19,23 @@ import InfiniteTableCell from './InfiniteTableCell.vue'
 
 export default {
   name: 'InfiniteTableRow',
-  components:{
+  components: {
     InfiniteTableCell
   },
-  props: ['rowData']
+  props: {
+    data: {
+      type: Array,
+      required: true
+    }
+  },
+  created(){
+    this.$emit('created')
+  },
+  methods: {
+    emitValue(value, column) {
+      this.$emit('input', {value,column})
+    }
+  }
 }
 </script>
 
