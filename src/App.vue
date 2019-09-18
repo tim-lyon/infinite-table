@@ -1,8 +1,13 @@
 <template>
   <div id="app">
     This is a table!
-    <infinite-table :headers="headers" exports :data-interface="dataInterface" />
-    <infinite-table headers v-model="sampleData" />
+    <infinite-table
+      :headers="headers"
+      :table-data="sampleData"
+      @input="inputRange"
+      @insert="insertRange"
+      @delete="deleteRange"
+    />
   </div>
 </template>
 
@@ -19,25 +24,11 @@ export default {
       sampleData: [
         ["a","b","c"],
         ["a","b","c"],
-        ["a","b","c"],
+        ["a","b",false],
         ["a","b","c"],
         ["a","b","c"],
         ["a","b","c"]
       ],
-      dataInterface: {
-        count: 500,
-        get(row) {
-          return new Promise(function(resolve, reject) {
-            setTimeout(() => {
-              resolve(["R" + row, "a\"b", "\"b\"", "c,ello"])
-            }, 1000);
-            
-          })
-        },
-        set(row, column, value) {
-          alert("set R" + row + "C" + column + " to " + value)
-        }
-      },
       headers: [
         {name: "name", type:"string", children: [
             {name: "area"},
@@ -54,6 +45,20 @@ export default {
         ]},
         {name: "hair", type:"string"}
       ]
+    }
+  },
+  methods: {
+    inputRange(payload) {
+      console.log('inputRange')
+      console.log(payload)
+    },
+    insertRange(payload) {
+      console.log('insertRange')
+      console.log(payload)
+    },
+    deleteRange(payload) {
+      console.log('deleteRange')
+      console.log(payload)
     }
   }
 }

@@ -1,7 +1,7 @@
 <template>
   <div class="table-container" tabindex="1" @keydown="OnTableKeypress">
     <InfiniteTableHeaders
-      :headers="headers_"
+      :headers="computedHeaders"
       :selectedColumns="selectedColumns"
       @selectColumnRange="selectColumns"
     />
@@ -17,10 +17,14 @@
           @cellMouseOver="onCellMouseOver"
           @rowMouseDown="onRowMouseDown(i+startRow)"
           @rowMouseOver="onRowMouseOver(i+startRow)"
-          @created="getRowData(i+startRow)"
-          :data="isDataInterface ? rowData[i+startRow] ? rowData[i+startRow] : ['...'] : getRowData(i+startRow)" 
+          :data="rowData(i+startRow)"
+          :activeColumn="active.C"
+          :isEditing="isEditing && active.R === i+startRow"
           :key="i+startRow" />
           <div :style="underlayStyle"></div>
+          <div :style="overlayStyle">
+            <input type="text" :value="inputValue" class="the-input"/>
+          </div>
         </div>
       </div>
       
@@ -32,7 +36,9 @@
     </div>
 
     <br><br>Selection: {{selection}}
-    <br>
+    <br>Active: {{active}}
+    <br>Editing: {{isEditing}}
+    <br>v: {{inputValue}}
   </div>
 
 </template>
@@ -55,62 +61,20 @@ export default {
     headers: {
       required: false
     },
-    dataInterface: {
-      type: Object,
-      required: false
-    },
-    value: {
+    tableData: {
       type: Array,
-      required: false
+      required: true
     },
     exports: {
       required: false
     }
   },
-  mounted(){
-    this.computeHeaders()
-  },
   methods: {
-    getRowData(iRow) {
-      if(!this.isDataInterface){
-        return this.value[iRow-1]
-      }
-      return new Promise(resolve => {
-        this.dataInterface.get(iRow).then(rowData=>{
-          this.$set(this.rowData, iRow, rowData)
-          resolve()
-        })
-      })
-    },
-    computeHeaders() {
-      if(Array.isArray(this.headers) || this.headers === undefined){
-        this.headers_ = this.headers
-      }
-      else if(!this.isDataInterface) {
-        this.headers_ = this.value[0].map((cell, iCol) => {
-          return {name: this.defaultColumnName(iCol+1)}
-        })
-      }
-      else{
-        this.dataInterface.get(1).then(row=>{
-          var data = row.map((cell, iCol) => {
-            return {name: this.defaultColumnName(iCol+1)}
-          })
-          this.headers_ = data
-        })
-      }
+    rowData(iRow) {
+      return this.tableData[iRow-1]
     },
     startExport(exportFunction){
-      this.getAllData().then(()=>{
-        exportFunction()
-      })
-    },
-    getAllData(){
-      var promises = []
-      for(var iRow = 1; iRow <= this.dataInterface.count; iRow++){
-        promises.push(this.getRowData(iRow))
-      }
-      return Promise.all(promises)
+      exportFunction()
     },
     exportCSV(){
       let csvFile = "data:text/csv;charset=utf-8,";
@@ -135,14 +99,35 @@ export default {
       link.click();
       document.body.removeChild(link);
     },
+    selectedRange(){
+      return {
+        start: {
+          R: this.selection.start.R,
+          C: this.selection.start.C,
+        },
+        end: {
+          R: this.selection.end.R,
+          C: this.selection.end.C,
+        }
+      }
+    },
+    cellRange(row, column){
+      return {
+        start: {
+          R: row,
+          C: column,
+        },
+        end: {
+          R: row,
+          C: column,
+        }
+      }
+    },
     setData(data, row){
-      if(this.isDataInterface){
-        this.dataInterface.set(row, data.column, data.value)
-      }
-      else{
-        this.$set(this.value[row-1], data.column, data.value)
-        this.$emit('input', this.value)
-      }
+        this.$emit('input', {
+          range: this.cellRange(row, data.column),
+          value: data.value
+        })
     },
     defaultColumnName(iCol) {
       for (var ret = '', a = 1, b = 26; (iCol -= a) >= 0; a = b, b *= 26) {
@@ -174,6 +159,8 @@ export default {
         case 'PageDown':
           this.OnArrow(0,ROW_COUNT)
           break
+        default:
+          this.isEditing = true
       }
     },
     scrollToRow(iRow){
@@ -196,6 +183,8 @@ export default {
         this.selection.start.R += dy
         this.selection.end.C = this.selection.start.C
         this.selection.end.R = this.selection.start.R
+        this.setActiveRow(this.selection.start.R)
+        this.setActiveColumn(this.selection.start.C)
       }
       this.clampSelection()
       this.scrollToRow(this.selection.end.R)
@@ -268,9 +257,13 @@ export default {
       this.lastScrollTop = scrollTop
     },
     onCellMouseDown(iCol){
+      if(this.isEditing && iCol !== this.active.C){
+        this.isEditing = false
+      }
       this.selection.end.C = iCol
       if(!event.shiftKey){
         this.selection.start.C = iCol
+        this.setActiveColumn(iCol)
       }
       window.getSelection().removeAllRanges();
     },
@@ -279,16 +272,29 @@ export default {
         this.selection.end.C = iCol
       }
     },
+    setActiveColumn(iCol){
+      if(this.isEditing && iCol !== this.active.C){
+        this.isEditing = false
+      }
+      this.active.C = iCol
+    },
     onRowMouseDown(iRow){
       this.selection.end.R = iRow
       if(!event.shiftKey){
         this.selection.start.R = iRow
+        this.setActiveRow(iRow)
       }
     },
     onRowMouseOver(iRow){
       if(event.buttons == 1){
         this.selection.end.R = iRow
       }
+    },
+    setActiveRow(iRow){
+      if(this.isEditing && iRow !== this.active.R){
+        this.isEditing = false
+      }
+      this.active.R = iRow
     },
     rowTopOffset(iRow){
       let offset = 30*(iRow-1)
@@ -299,12 +305,20 @@ export default {
     },
     columnLeftOffset(iCol){
       return 6*iCol+'em'
+    },
+    rowOffset(iRow){
+      let offset = ROW_HEIGHT*(iRow - this.startRow - 1)
+      if(offset < 0){
+        offset = 0
+      }
+      if(offset > ROW_HEIGHT*this.renderedRows){
+        ofset = ROW_HEIGHT*this.renderedRows
+      }
+      return offset
     }
   },
   data(){
     return {
-      headers_: undefined,
-      rowData: {},
       referenceRow: {row: 0, scrollTop: 0},
       lastScrollTop: 0,
       renderedRows: ROW_COUNT+2*BUFFER_ROWS,
@@ -312,6 +326,11 @@ export default {
       topBufferHeight: 0,
       contentHeight: ROW_COUNT*ROW_HEIGHT,
 
+      isEditing: false,
+      active: {
+        R: 0,
+        C: 0
+      },
       selection: {
         start: {
           R:0,
@@ -325,15 +344,23 @@ export default {
     }
   },
   computed: {
-    isDataInterface(){
-      return this.dataInterface !== undefined
+    inputValue() {
+      return this.tableData[this.active.R][this.active.C]
+    },
+    computedHeaders() {
+      if(Array.isArray(this.headers) || this.headers === undefined){
+        return this.headers
+      }
+      return this.tableData[0].map((cell, iCol) => {
+        return {name: this.defaultColumnName(iCol+1)}
+      })
     },
     computedExports(){
       return Array.isArray(this.exports) || this.exports === undefined ?
       this.exports : {CSV: this.exportCSV}
     },
     rowCount() {
-      return this.isDataInterface ? this.dataInterface.count : this.value.length
+      return this.tableData.length
     },
     renderedRowCount() {
       return Math.min(this.renderedRows, this.rowCount - this.startRow)
@@ -351,34 +378,32 @@ export default {
       }
       return null
     },
+    overlayStyle(){
+      return {
+        position: 'absolute',
+        top: this.rowOffset(this.active.R)+'px',
+        height: ROW_HEIGHT-4+'px',
+        left: this.columnLeftOffset(this.active.C),
+        background: 'yellow',
+        margin: '2px',
+        lineHeight: ROW_HEIGHT + 'px',
+        width: 6-0.2 + 'em',
+      }
+    },
     underlayStyle(){
       const lowestRow = Math.min(this.selection.start.R,this.selection.end.R)
       const highestRow = Math.max(this.selection.start.R,this.selection.end.R)
-      let topOffset = 30*(lowestRow - this.startRow - 1)
-      if(topOffset < 0){
-        topOffset =0
-      }
-      if(topOffset>30*this.renderedRows){
-        topOffset = 30*this.renderedRows
-      }
+      let topOffset = this.rowOffset(lowestRow)
+      let bottomOffset = this.rowOffset(highestRow)
 
-      let bottomOffset = 30*(highestRow - this.startRow - 1)
-      if(bottomOffset < 0){
-        bottomOffset =0
-      }
-      if(bottomOffset>30*this.renderedRows){
-        bottomOffset = 30*this.renderedRows
-      }
-      const height = 26+bottomOffset-topOffset
-      
+      const height = ROW_HEIGHT-4+bottomOffset-topOffset
       return {
         position: 'absolute',
         top: topOffset+'px',
         height: height+'px',
         left: this.columnLeftOffset(Math.min(this.selection.start.C,this.selection.end.C)),
         background: 'rgb(240,240,255)',
-        border: '0.1em solid rgb(180,180,255)',
-        lineHeight: '30px',
+        border: '2px solid rgb(180,180,255)',
         width: (6*(Math.abs(this.selection.start.C-this.selection.end.C)+1))-0.2+'em',
         zIndex: '-1'
       }
@@ -397,5 +422,13 @@ export default {
   overflow-y: scroll;
   position: relative;
   cursor: cell;
+}
+.the-input{
+  display: block;
+  height: 100%;
+  width: 100%;
+  outline: none;
+  border: none;
+  background: none
 }
 </style>
