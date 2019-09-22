@@ -1,15 +1,16 @@
 <template>
-  <div class="row"
-    @mousedown="$emit('rowMouseDown')"
-    @mouseover="$emit('rowMouseOver')"
-  >
+  <div class="row">
     <InfiniteTableCell
-      v-for="(cell, iCol) of data"
+      v-for="(cell, columnIndex) of data"
+      :config="config"
       :value="cell"
-      @input="emitValue($event, iCol)"
-      @cellMouseDown="$emit('cellMouseDown', iCol)"
-      @cellMouseOver="$emit('cellMouseOver', iCol)"
-      :key="iCol"
+      @cellMouseDown="$emit('cellMouseDown', {R: rowIndex, C: columnIndex})"
+      @cellMouseOver="$emit('cellMouseOver', {R: rowIndex, C: columnIndex})"
+      :key="columnIndex"
+      :selected-range="selectedRange"
+      :is-active="rowIndex === activeCell.R && columnIndex === activeCell.C"
+      :row-index="rowIndex"
+      :column-index="columnIndex"
     />
   </div>
 </template>
@@ -22,19 +23,9 @@ export default {
   components: {
     InfiniteTableCell
   },
-  props: {
-    data: {
-      type: Array,
-      required: true
-    }
-  },
+  props: ['config', 'data', 'rowIndex', 'selectedRange', 'activeCell'],
   created(){
     this.$emit('created')
-  },
-  methods: {
-    emitValue(value, column) {
-      this.$emit('input', {value,column})
-    }
   }
 }
 </script>

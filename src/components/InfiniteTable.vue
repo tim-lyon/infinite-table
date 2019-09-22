@@ -1,6 +1,7 @@
 <template>
   <div class="table-container" tabindex="1" @keydown="OnTableKeypress">
     <InfiniteTableHeaders
+      :config="config"
       :headers="computedHeaders"
       :selectedColumns="selectedColumns"
       @selectColumnRange="selectColumns"
@@ -10,21 +11,16 @@
         <div :style="{position:'relative', top:topBufferHeight+'px'}">
           <InfiniteTableRow
           v-for="i in renderedRowCount"
-          :index="i+startRow"
+          :config="config"
+          :row-index="i+startRow"
           :style="{background: (i+startRow)%2 ? 'rgba(0,0,0,0.05)' : ''}"
           @input="setData($event, i+startRow)"
           @cellMouseDown="onCellMouseDown"
           @cellMouseOver="onCellMouseOver"
-          @rowMouseDown="onRowMouseDown(i+startRow)"
-          @rowMouseOver="onRowMouseOver(i+startRow)"
           :data="rowData(i+startRow)"
-          :activeColumn="active.C"
-          :isEditing="isEditing && active.R === i+startRow"
+          :selected-range="selectedRange"
+          :active-cell="active"
           :key="i+startRow" />
-          <div :style="underlayStyle"></div>
-          <div :style="overlayStyle">
-            <input type="text" :value="inputValue" class="the-input"/>
-          </div>
         </div>
       </div>
       
@@ -58,6 +54,24 @@ export default {
     InfiniteTableRow
   },
   props: {
+    config: {
+      type: Object,
+      required: false,
+      default() {
+        return {
+          style: {
+            selection: {
+              border: {
+                color: 'rgb(0, 135, 189)'
+              },
+              fill: {
+                color: 'rgba(0, 135, 189, .13)'
+              }
+            }
+          }
+        }
+      }
+    },
     headers: {
       required: false
     },
@@ -71,7 +85,7 @@ export default {
   },
   methods: {
     rowData(iRow) {
-      return this.tableData[iRow-1]
+      return this.tableData[iRow]
     },
     startExport(exportFunction){
       exportFunction()
@@ -98,18 +112,6 @@ export default {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    },
-    selectedRange(){
-      return {
-        start: {
-          R: this.selection.start.R,
-          C: this.selection.start.C,
-        },
-        end: {
-          R: this.selection.end.R,
-          C: this.selection.end.C,
-        }
-      }
     },
     cellRange(row, column){
       return {
@@ -151,7 +153,11 @@ export default {
           break
         case 'Tab':
           event.preventDefault()
-          this.OnArrow(1,0)
+          this.OnTab()
+          break
+        case 'Enter':
+          event.preventDefault()
+          this.OnEnter()
           break
         case 'PageUp':
           this.OnArrow(0,-ROW_COUNT)
@@ -189,24 +195,59 @@ export default {
       this.clampSelection()
       this.scrollToRow(this.selection.end.R)
     },
+    OnTab(){
+      if(this.selection.start.R === this.selection.end.R &&
+      this.selection.start.C === this.selection.end.C){
+        this.OnArrow(1,0)
+        return
+      }
+      const newRow = this.active.C === this.selectedRange.end.C
+      this.setActiveColumn( newRow ? this.selectedRange.start.C : this.active.C + 1)
+      if(newRow){
+        this.setActiveRow(this.active.R === this.selectedRange.end.R ?
+        this.selectedRange.start.R : this.active.R + 1)
+      }
+    },
+    OnEnter(){
+      if(this.selection.start.R === this.selection.end.R &&
+      this.selection.start.C === this.selection.end.C){
+        this.OnArrow(0,1)
+        return
+      }
+      const newColumn = this.active.R === this.selectedRange.end.R
+      this.setActiveRow( newColumn ? this.selectedRange.start.R : this.active.R + 1)
+      if(newColumn){
+        this.setActiveColumn(this.active.C === this.selectedRange.end.C ?
+        this.selectedRange.start.C : this.active.C + 1)
+      }
+    },
     clampSelection(){
-      if(this.selection.start.R < 1){
-        this.selection.start.R = 1
+      if(this.selection.start.R < 0){
+        this.selection.start.R = 0
       }
-      else if(this.selection.start.R > this.rowCount){
-        this.selection.start.R = this.rowCount
+      else if(this.selection.start.R >= this.rowCount){
+        this.selection.start.R = this.rowCount - 1
       }
-      if(this.selection.end.R < 1){
-        this.selection.end.R = 1
+
+      if(this.selection.end.R < 0){
+        this.selection.end.R = 0
       }
-      else if(this.selection.end.R > this.rowCount){
-        this.selection.end.R = this.rowCount
+      else if(this.selection.end.R >= this.rowCount){
+        this.selection.end.R = this.rowCount - 1
       }
+
       if(this.selection.start.C < 0){
         this.selection.start.C = 0
       }
+      else if(this.selection.start.C >= this.columnCount){
+        this.selection.start.C = this.columnCount - 1
+      }
+
       if(this.selection.end.C < 0){
         this.selection.end.C = 0
+      }
+      else if(this.selection.end.C >= this.columnCount){
+        this.selection.end.C = this.columnCount - 1
       }
     },
     selectColumns(columns){
@@ -214,8 +255,8 @@ export default {
         this.selection.start.C = columns.start - 1
       }
       this.selection.end.C = columns.end - 1
-      this.selection.start.R = 1
-      this.selection.end.R = this.rowCount
+      this.selection.start.R = 0
+      this.selection.end.R = this.rowCount - 1
     },
     scrollTable(){
       const scrollTop = event.target.scrollTop
@@ -256,65 +297,44 @@ export default {
       }
       this.lastScrollTop = scrollTop
     },
-    onCellMouseDown(iCol){
-      if(this.isEditing && iCol !== this.active.C){
+    onCellMouseDown(cell){
+      if(this.isEditing && cell.C !== this.active.C){
         this.isEditing = false
       }
-      this.selection.end.C = iCol
+      this.selection.end.C = cell.C
       if(!event.shiftKey){
-        this.selection.start.C = iCol
-        this.setActiveColumn(iCol)
+        this.selection.start.C = cell.C
+        this.setActiveColumn(cell.C)
+      }
+
+      this.selection.end.R = cell.R
+      if(!event.shiftKey){
+        this.selection.start.R = cell.R
+        this.setActiveRow(cell.R)
       }
       window.getSelection().removeAllRanges();
     },
-    onCellMouseOver(iCol){
+    onCellMouseOver(cell){
       if(event.buttons == 1){
-        this.selection.end.C = iCol
+        this.selection.end.C = cell.C
+        this.selection.end.R = cell.R
       }
     },
     setActiveColumn(iCol){
       if(this.isEditing && iCol !== this.active.C){
         this.isEditing = false
       }
-      this.active.C = iCol
-    },
-    onRowMouseDown(iRow){
-      this.selection.end.R = iRow
-      if(!event.shiftKey){
-        this.selection.start.R = iRow
-        this.setActiveRow(iRow)
-      }
-    },
-    onRowMouseOver(iRow){
-      if(event.buttons == 1){
-        this.selection.end.R = iRow
+      if(iCol >= 0 && iCol < this.columns){
+        this.active.C = iCol
       }
     },
     setActiveRow(iRow){
       if(this.isEditing && iRow !== this.active.R){
         this.isEditing = false
       }
-      this.active.R = iRow
-    },
-    rowTopOffset(iRow){
-      let offset = 30*(iRow-1)
-      if(this.rowCount > MAX_ROWS){
-        offset += this.referenceRow.scrollTop - 30* this.referenceRow.row
+      if(iRow >= 0 && iRow < this.rowCount){
+        this.active.R = iRow
       }
-      return offset+'px'
-    },
-    columnLeftOffset(iCol){
-      return 6*iCol+'em'
-    },
-    rowOffset(iRow){
-      let offset = ROW_HEIGHT*(iRow - this.startRow - 1)
-      if(offset < 0){
-        offset = 0
-      }
-      if(offset > ROW_HEIGHT*this.renderedRows){
-        ofset = ROW_HEIGHT*this.renderedRows
-      }
-      return offset
     }
   },
   data(){
@@ -322,7 +342,7 @@ export default {
       referenceRow: {row: 0, scrollTop: 0},
       lastScrollTop: 0,
       renderedRows: ROW_COUNT+2*BUFFER_ROWS,
-      startRow: 0,
+      startRow: -1,
       topBufferHeight: 0,
       contentHeight: ROW_COUNT*ROW_HEIGHT,
 
@@ -347,6 +367,18 @@ export default {
     inputValue() {
       return this.tableData[this.active.R][this.active.C]
     },
+    selectedRange(){
+      return {
+        start: {
+          R: Math.min(this.selection.start.R, this.selection.end.R),
+          C: Math.min(this.selection.start.C, this.selection.end.C)
+        },
+        end: {
+          R: Math.max(this.selection.start.R, this.selection.end.R),
+          C: Math.max(this.selection.start.C, this.selection.end.C)
+        }
+      }
+    },
     computedHeaders() {
       if(Array.isArray(this.headers) || this.headers === undefined){
         return this.headers
@@ -362,6 +394,9 @@ export default {
     rowCount() {
       return this.tableData.length
     },
+    columnCount() {
+      return this.tableData[0].length
+    },
     renderedRowCount() {
       return Math.min(this.renderedRows, this.rowCount - this.startRow)
     },
@@ -372,41 +407,11 @@ export default {
       if(Math.abs(this.selection.start.R -
       this.selection.end.R) == this.rowCount-1){
         return {
-          start: Math.min(this.selection.start.C,this.selection.end.C),
-          end: Math.max(this.selection.start.C,this.selection.end.C)
+          start: this.selectedRange.start.C,
+          end: this.selectedRange.end.C
         }
       }
       return null
-    },
-    overlayStyle(){
-      return {
-        position: 'absolute',
-        top: this.rowOffset(this.active.R)+'px',
-        height: ROW_HEIGHT-4+'px',
-        left: this.columnLeftOffset(this.active.C),
-        background: 'yellow',
-        margin: '2px',
-        lineHeight: ROW_HEIGHT + 'px',
-        width: 6-0.2 + 'em',
-      }
-    },
-    underlayStyle(){
-      const lowestRow = Math.min(this.selection.start.R,this.selection.end.R)
-      const highestRow = Math.max(this.selection.start.R,this.selection.end.R)
-      let topOffset = this.rowOffset(lowestRow)
-      let bottomOffset = this.rowOffset(highestRow)
-
-      const height = ROW_HEIGHT-4+bottomOffset-topOffset
-      return {
-        position: 'absolute',
-        top: topOffset+'px',
-        height: height+'px',
-        left: this.columnLeftOffset(Math.min(this.selection.start.C,this.selection.end.C)),
-        background: 'rgb(240,240,255)',
-        border: '2px solid rgb(180,180,255)',
-        width: (6*(Math.abs(this.selection.start.C-this.selection.end.C)+1))-0.2+'em',
-        zIndex: '-1'
-      }
     }
   }
 }
@@ -429,6 +434,9 @@ export default {
   width: 100%;
   outline: none;
   border: none;
-  background: none
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 </style>
