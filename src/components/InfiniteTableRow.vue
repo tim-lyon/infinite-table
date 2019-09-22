@@ -1,6 +1,6 @@
 <template>
-  <div class="row">
-    <InfiniteTableCell
+  <tr class="row" :style="rowStyle">
+    <td is="InfiniteTableCell"
       v-for="(cell, columnIndex) of data"
       :config="config"
       :value="cell"
@@ -12,7 +12,7 @@
       :row-index="rowIndex"
       :column-index="columnIndex"
     />
-  </div>
+  </tr>
 </template>
 
 <script>
@@ -26,13 +26,25 @@ export default {
   props: ['config', 'data', 'rowIndex', 'selectedRange', 'activeCell'],
   created(){
     this.$emit('created')
+  },
+  computed: {
+    rowStyle() {
+      let background = 'none'
+      if(this.config.style && this.config.style.row){
+        if(this.config.style.row.background){
+          let color = this.config.style.row.background
+          background = Array.isArray(color) ? color[this.rowIndex%color.length] : color
+        }
+      }
+
+      const border = this.config.style.row.border
+      return {
+        background: background,
+        borderTop: border.width + 'px solid ' + border.color,
+        borderBottom: border.width + 'px solid ' + border.color,
+        lineHeight: '30px'
+      }
+    }
   }
 }
 </script>
-
-<style scoped>
-.row{
-  display:flex;
-  line-height:30px;
-}
-</style>

@@ -96,3 +96,25 @@ let myExports = {
 ```html
 <infinite-table :exports="myExports" />
 ```
+
+## Configuration
+The `infinite-table` component can be configued by passing a `config` prop with optional configurations as follows
+
+```javascript
+config = {
+    style: {
+        row: {
+            background: ['red','blue','green'], // color or array or repeating colours
+            border: 'black'
+        },
+        selection: {
+            border: {
+                color: 'blue'
+            },
+            fill: {
+                color: 'pink'
+            }
+        }
+    }
+}
+```

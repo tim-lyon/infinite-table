@@ -1,4 +1,5 @@
 <template>
+<div>
   <div class="table-container" tabindex="1" @keydown="OnTableKeypress">
     <InfiniteTableHeaders
       :config="config"
@@ -8,12 +9,14 @@
     />
     <div class="table-body" ref="body" :style="{height:contentHeight+'px'}" @scroll="scrollTable">
       <div :style="{height: totalHeight+'px'}">
-        <div :style="{position:'relative', top:topBufferHeight+'px'}">
-          <InfiniteTableRow
+        <table :style="{position:'relative', top:topBufferHeight+'px', borderCollapse: 'collapse'}">
+          <colgroup>
+            <col v-for="i of columnCount" :key="i" :style="columnStyle"/>
+          </colgroup>
+          <tr is="InfiniteTableRow"
           v-for="i in renderedRowCount"
           :config="config"
           :row-index="i+startRow"
-          :style="{background: (i+startRow)%2 ? 'rgba(0,0,0,0.05)' : ''}"
           @input="setData($event, i+startRow)"
           @cellMouseDown="onCellMouseDown"
           @cellMouseOver="onCellMouseOver"
@@ -21,22 +24,21 @@
           :selected-range="selectedRange"
           :active-cell="active"
           :key="i+startRow" />
-        </div>
+        </table>
       </div>
-      
     </div>
-    <div>
-      <button v-for="(exportFunction, name) in computedExports" :key="name" @click="startExport(exportFunction)">
-        Export {{name}}
-      </button>
-    </div>
-
-    <br><br>Selection: {{selection}}
-    <br>Active: {{active}}
-    <br>Editing: {{isEditing}}
-    <br>v: {{inputValue}}
+  </div>
+  <div>
+    <button v-for="(exportFunction, name) in computedExports" :key="name" @click="startExport(exportFunction)">
+      Export {{name}}
+    </button>
   </div>
 
+  <br><br>Selection: {{selection}}
+  <br>Active: {{active}}
+  <br>Editing: {{isEditing}}
+  <br>v: {{inputValue}}
+</div>
 </template>
 
 <script>
@@ -47,6 +49,31 @@ const ROW_HEIGHT = 30
 const BUFFER_ROWS = 5
 const ROW_COUNT = 12
 const MAX_ROWS = 100000
+const DEFAULT_CONFIG = {
+  style: {
+    row: {
+      border: {
+        color: '#aaa',
+        width: 1
+      }
+    },
+    column: {
+      border: {
+        color: '#aaa',
+        width: 1
+      }
+    },
+    selection: {
+      border: {
+        color: 'rgb(0, 135, 189)',
+        width: 1
+      },
+      fill: {
+        color: 'rgba(0, 135, 189, .13)'
+      }
+    }
+  }
+}
 export default {
   name: 'InfiniteTable',
   components: {
@@ -58,18 +85,7 @@ export default {
       type: Object,
       required: false,
       default() {
-        return {
-          style: {
-            selection: {
-              border: {
-                color: 'rgb(0, 135, 189)'
-              },
-              fill: {
-                color: 'rgba(0, 135, 189, .13)'
-              }
-            }
-          }
-        }
+        return DEFAULT_CONFIG
       }
     },
     headers: {
@@ -324,7 +340,7 @@ export default {
       if(this.isEditing && iCol !== this.active.C){
         this.isEditing = false
       }
-      if(iCol >= 0 && iCol < this.columns){
+      if(iCol >= 0 && iCol < this.columnCount){
         this.active.C = iCol
       }
     },
@@ -364,6 +380,14 @@ export default {
     }
   },
   computed: {
+    columnStyle(){
+      const border = this.config.style.column.border
+      return {
+        borderWidth: '0 ' + border.width + 'px',
+        borderStyle: 'solid',
+        borderColor: border.color
+      }
+    },
     inputValue() {
       return this.tableData[this.active.R][this.active.C]
     },
@@ -419,8 +443,7 @@ export default {
 
 <style scoped>
 .table-container{
-  border:1px solid lime;
-  padding-left:2em;
+  border-bottom:1px solid lime;
   outline:none;
 }
 .table-body{
