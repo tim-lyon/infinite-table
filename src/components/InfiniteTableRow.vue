@@ -1,17 +1,18 @@
 <template>
-  <div class="row"
-    @mousedown="$emit('rowMouseDown')"
-    @mouseover="$emit('rowMouseOver')"
-  >
-    <InfiniteTableCell
-      v-for="(cell, iCol) of data"
+  <tr class="row" :style="rowStyle">
+    <td is="InfiniteTableCell"
+      v-for="(cell, columnIndex) of data"
+      :config="config"
       :value="cell"
-      @input="emitValue($event, iCol)"
-      @cellMouseDown="$emit('cellMouseDown', iCol)"
-      @cellMouseOver="$emit('cellMouseOver', iCol)"
-      :key="iCol"
+      @cellMouseDown="$emit('cellMouseDown', {R: rowIndex, C: columnIndex})"
+      @cellMouseOver="$emit('cellMouseOver', {R: rowIndex, C: columnIndex})"
+      :key="columnIndex"
+      :selected-range="selectedRange"
+      :is-active="rowIndex === activeCell.R && columnIndex === activeCell.C"
+      :row-index="rowIndex"
+      :column-index="columnIndex"
     />
-  </div>
+  </tr>
 </template>
 
 <script>
@@ -22,26 +23,28 @@ export default {
   components: {
     InfiniteTableCell
   },
-  props: {
-    data: {
-      type: Array,
-      required: true
-    }
-  },
+  props: ['config', 'data', 'rowIndex', 'selectedRange', 'activeCell'],
   created(){
     this.$emit('created')
   },
-  methods: {
-    emitValue(value, column) {
-      this.$emit('input', {value,column})
+  computed: {
+    rowStyle() {
+      let background = 'none'
+      if(this.config.style && this.config.style.row){
+        if(this.config.style.row.background){
+          let color = this.config.style.row.background
+          background = Array.isArray(color) ? color[this.rowIndex%color.length] : color
+        }
+      }
+
+      const border = this.config.style.row.border
+      return {
+        background: background,
+        borderTop: border.width + 'px solid ' + border.color,
+        borderBottom: border.width + 'px solid ' + border.color,
+        lineHeight: '30px'
+      }
     }
   }
 }
 </script>
-
-<style scoped>
-.row{
-  display:flex;
-  line-height:30px;
-}
-</style>

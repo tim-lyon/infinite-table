@@ -1,40 +1,44 @@
 <template>
+<div>
   <div class="table-container" tabindex="1" @keydown="OnTableKeypress">
     <InfiniteTableHeaders
-      :headers="headers_"
+      :config="config"
+      :headers="computedHeaders"
       :selectedColumns="selectedColumns"
       @selectColumnRange="selectColumns"
     />
     <div class="table-body" ref="body" :style="{height:contentHeight+'px'}" @scroll="scrollTable">
       <div :style="{height: totalHeight+'px'}">
-        <div :style="{position:'relative', top:topBufferHeight+'px'}">
-          <InfiniteTableRow
+        <table :style="{position:'relative', top:topBufferHeight+'px', borderCollapse: 'collapse'}">
+          <colgroup>
+            <col v-for="i of columnCount" :key="i" :style="columnStyle"/>
+          </colgroup>
+          <tr is="InfiniteTableRow"
           v-for="i in renderedRowCount"
-          :index="i+startRow"
-          :style="{background: (i+startRow)%2 ? 'rgba(0,0,0,0.05)' : ''}"
+          :config="config"
+          :row-index="i+startRow"
           @input="setData($event, i+startRow)"
           @cellMouseDown="onCellMouseDown"
           @cellMouseOver="onCellMouseOver"
-          @rowMouseDown="onRowMouseDown(i+startRow)"
-          @rowMouseOver="onRowMouseOver(i+startRow)"
-          @created="getRowData(i+startRow)"
-          :data="isDataInterface ? rowData[i+startRow] ? rowData[i+startRow] : ['...'] : getRowData(i+startRow)" 
+          :data="rowData(i+startRow)"
+          :selected-range="selectedRange"
+          :active-cell="active"
           :key="i+startRow" />
-          <div :style="underlayStyle"></div>
-        </div>
+        </table>
       </div>
-      
     </div>
-    <div>
-      <button v-for="(exportFunction, name) in computedExports" :key="name" @click="startExport(exportFunction)">
-        Export {{name}}
-      </button>
-    </div>
-
-    <br><br>Selection: {{selection}}
-    <br>
+  </div>
+  <div>
+    <button v-for="(exportFunction, name) in computedExports" :key="name" @click="startExport(exportFunction)">
+      Export {{name}}
+    </button>
   </div>
 
+  <br><br>Selection: {{selection}}
+  <br>Active: {{active}}
+  <br>Editing: {{isEditing}}
+  <br>v: {{inputValue}}
+</div>
 </template>
 
 <script>
@@ -45,6 +49,31 @@ const ROW_HEIGHT = 30
 const BUFFER_ROWS = 5
 const ROW_COUNT = 12
 const MAX_ROWS = 100000
+const DEFAULT_CONFIG = {
+  style: {
+    row: {
+      border: {
+        color: '#aaa',
+        width: 1
+      }
+    },
+    column: {
+      border: {
+        color: '#aaa',
+        width: 1
+      }
+    },
+    selection: {
+      border: {
+        color: 'rgb(0, 135, 189)',
+        width: 1
+      },
+      fill: {
+        color: 'rgba(0, 135, 189, .13)'
+      }
+    }
+  }
+}
 export default {
   name: 'InfiniteTable',
   components: {
@@ -52,65 +81,30 @@ export default {
     InfiniteTableRow
   },
   props: {
+    config: {
+      type: Object,
+      required: false,
+      default() {
+        return DEFAULT_CONFIG
+      }
+    },
     headers: {
       required: false
     },
-    dataInterface: {
-      type: Object,
-      required: false
-    },
-    value: {
+    tableData: {
       type: Array,
-      required: false
+      required: true
     },
     exports: {
       required: false
     }
   },
-  mounted(){
-    this.computeHeaders()
-  },
   methods: {
-    getRowData(iRow) {
-      if(!this.isDataInterface){
-        return this.value[iRow-1]
-      }
-      return new Promise(resolve => {
-        this.dataInterface.get(iRow).then(rowData=>{
-          this.$set(this.rowData, iRow, rowData)
-          resolve()
-        })
-      })
-    },
-    computeHeaders() {
-      if(Array.isArray(this.headers) || this.headers === undefined){
-        this.headers_ = this.headers
-      }
-      else if(!this.isDataInterface) {
-        this.headers_ = this.value[0].map((cell, iCol) => {
-          return {name: this.defaultColumnName(iCol+1)}
-        })
-      }
-      else{
-        this.dataInterface.get(1).then(row=>{
-          var data = row.map((cell, iCol) => {
-            return {name: this.defaultColumnName(iCol+1)}
-          })
-          this.headers_ = data
-        })
-      }
+    rowData(iRow) {
+      return this.tableData[iRow]
     },
     startExport(exportFunction){
-      this.getAllData().then(()=>{
-        exportFunction()
-      })
-    },
-    getAllData(){
-      var promises = []
-      for(var iRow = 1; iRow <= this.dataInterface.count; iRow++){
-        promises.push(this.getRowData(iRow))
-      }
-      return Promise.all(promises)
+      exportFunction()
     },
     exportCSV(){
       let csvFile = "data:text/csv;charset=utf-8,";
@@ -135,14 +129,23 @@ export default {
       link.click();
       document.body.removeChild(link);
     },
+    cellRange(row, column){
+      return {
+        start: {
+          R: row,
+          C: column,
+        },
+        end: {
+          R: row,
+          C: column,
+        }
+      }
+    },
     setData(data, row){
-      if(this.isDataInterface){
-        this.dataInterface.set(row, data.column, data.value)
-      }
-      else{
-        this.$set(this.value[row-1], data.column, data.value)
-        this.$emit('input', this.value)
-      }
+        this.$emit('input', {
+          range: this.cellRange(row, data.column),
+          value: data.value
+        })
     },
     defaultColumnName(iCol) {
       for (var ret = '', a = 1, b = 26; (iCol -= a) >= 0; a = b, b *= 26) {
@@ -166,7 +169,11 @@ export default {
           break
         case 'Tab':
           event.preventDefault()
-          this.OnArrow(1,0)
+          this.OnTab()
+          break
+        case 'Enter':
+          event.preventDefault()
+          this.OnEnter()
           break
         case 'PageUp':
           this.OnArrow(0,-ROW_COUNT)
@@ -174,6 +181,8 @@ export default {
         case 'PageDown':
           this.OnArrow(0,ROW_COUNT)
           break
+        default:
+          this.isEditing = true
       }
     },
     scrollToRow(iRow){
@@ -196,28 +205,65 @@ export default {
         this.selection.start.R += dy
         this.selection.end.C = this.selection.start.C
         this.selection.end.R = this.selection.start.R
+        this.setActiveRow(this.selection.start.R)
+        this.setActiveColumn(this.selection.start.C)
       }
       this.clampSelection()
       this.scrollToRow(this.selection.end.R)
     },
+    OnTab(){
+      if(this.selection.start.R === this.selection.end.R &&
+      this.selection.start.C === this.selection.end.C){
+        this.OnArrow(1,0)
+        return
+      }
+      const newRow = this.active.C === this.selectedRange.end.C
+      this.setActiveColumn( newRow ? this.selectedRange.start.C : this.active.C + 1)
+      if(newRow){
+        this.setActiveRow(this.active.R === this.selectedRange.end.R ?
+        this.selectedRange.start.R : this.active.R + 1)
+      }
+    },
+    OnEnter(){
+      if(this.selection.start.R === this.selection.end.R &&
+      this.selection.start.C === this.selection.end.C){
+        this.OnArrow(0,1)
+        return
+      }
+      const newColumn = this.active.R === this.selectedRange.end.R
+      this.setActiveRow( newColumn ? this.selectedRange.start.R : this.active.R + 1)
+      if(newColumn){
+        this.setActiveColumn(this.active.C === this.selectedRange.end.C ?
+        this.selectedRange.start.C : this.active.C + 1)
+      }
+    },
     clampSelection(){
-      if(this.selection.start.R < 1){
-        this.selection.start.R = 1
+      if(this.selection.start.R < 0){
+        this.selection.start.R = 0
       }
-      else if(this.selection.start.R > this.rowCount){
-        this.selection.start.R = this.rowCount
+      else if(this.selection.start.R >= this.rowCount){
+        this.selection.start.R = this.rowCount - 1
       }
-      if(this.selection.end.R < 1){
-        this.selection.end.R = 1
+
+      if(this.selection.end.R < 0){
+        this.selection.end.R = 0
       }
-      else if(this.selection.end.R > this.rowCount){
-        this.selection.end.R = this.rowCount
+      else if(this.selection.end.R >= this.rowCount){
+        this.selection.end.R = this.rowCount - 1
       }
+
       if(this.selection.start.C < 0){
         this.selection.start.C = 0
       }
+      else if(this.selection.start.C >= this.columnCount){
+        this.selection.start.C = this.columnCount - 1
+      }
+
       if(this.selection.end.C < 0){
         this.selection.end.C = 0
+      }
+      else if(this.selection.end.C >= this.columnCount){
+        this.selection.end.C = this.columnCount - 1
       }
     },
     selectColumns(columns){
@@ -225,8 +271,8 @@ export default {
         this.selection.start.C = columns.start - 1
       }
       this.selection.end.C = columns.end - 1
-      this.selection.start.R = 1
-      this.selection.end.R = this.rowCount
+      this.selection.start.R = 0
+      this.selection.end.R = this.rowCount - 1
     },
     scrollTable(){
       const scrollTop = event.target.scrollTop
@@ -267,51 +313,60 @@ export default {
       }
       this.lastScrollTop = scrollTop
     },
-    onCellMouseDown(iCol){
-      this.selection.end.C = iCol
+    onCellMouseDown(cell){
+      if(this.isEditing && cell.C !== this.active.C){
+        this.isEditing = false
+      }
+      this.selection.end.C = cell.C
       if(!event.shiftKey){
-        this.selection.start.C = iCol
+        this.selection.start.C = cell.C
+        this.setActiveColumn(cell.C)
+      }
+
+      this.selection.end.R = cell.R
+      if(!event.shiftKey){
+        this.selection.start.R = cell.R
+        this.setActiveRow(cell.R)
       }
       window.getSelection().removeAllRanges();
     },
-    onCellMouseOver(iCol){
+    onCellMouseOver(cell){
       if(event.buttons == 1){
-        this.selection.end.C = iCol
+        this.selection.end.C = cell.C
+        this.selection.end.R = cell.R
       }
     },
-    onRowMouseDown(iRow){
-      this.selection.end.R = iRow
-      if(!event.shiftKey){
-        this.selection.start.R = iRow
+    setActiveColumn(iCol){
+      if(this.isEditing && iCol !== this.active.C){
+        this.isEditing = false
+      }
+      if(iCol >= 0 && iCol < this.columnCount){
+        this.active.C = iCol
       }
     },
-    onRowMouseOver(iRow){
-      if(event.buttons == 1){
-        this.selection.end.R = iRow
+    setActiveRow(iRow){
+      if(this.isEditing && iRow !== this.active.R){
+        this.isEditing = false
       }
-    },
-    rowTopOffset(iRow){
-      let offset = 30*(iRow-1)
-      if(this.rowCount > MAX_ROWS){
-        offset += this.referenceRow.scrollTop - 30* this.referenceRow.row
+      if(iRow >= 0 && iRow < this.rowCount){
+        this.active.R = iRow
       }
-      return offset+'px'
-    },
-    columnLeftOffset(iCol){
-      return 6*iCol+'em'
     }
   },
   data(){
     return {
-      headers_: undefined,
-      rowData: {},
       referenceRow: {row: 0, scrollTop: 0},
       lastScrollTop: 0,
       renderedRows: ROW_COUNT+2*BUFFER_ROWS,
-      startRow: 0,
+      startRow: -1,
       topBufferHeight: 0,
       contentHeight: ROW_COUNT*ROW_HEIGHT,
 
+      isEditing: false,
+      active: {
+        R: 0,
+        C: 0
+      },
       selection: {
         start: {
           R:0,
@@ -325,15 +380,46 @@ export default {
     }
   },
   computed: {
-    isDataInterface(){
-      return this.dataInterface !== undefined
+    columnStyle(){
+      const border = this.config.style.column.border
+      return {
+        borderWidth: '0 ' + border.width + 'px',
+        borderStyle: 'solid',
+        borderColor: border.color
+      }
+    },
+    inputValue() {
+      return this.tableData[this.active.R][this.active.C]
+    },
+    selectedRange(){
+      return {
+        start: {
+          R: Math.min(this.selection.start.R, this.selection.end.R),
+          C: Math.min(this.selection.start.C, this.selection.end.C)
+        },
+        end: {
+          R: Math.max(this.selection.start.R, this.selection.end.R),
+          C: Math.max(this.selection.start.C, this.selection.end.C)
+        }
+      }
+    },
+    computedHeaders() {
+      if(Array.isArray(this.headers) || this.headers === undefined){
+        return this.headers
+      }
+      return this.tableData[0].map((cell, iCol) => {
+        return {name: this.defaultColumnName(iCol+1)}
+      })
     },
     computedExports(){
       return Array.isArray(this.exports) || this.exports === undefined ?
       this.exports : {CSV: this.exportCSV}
     },
     rowCount() {
-      return this.isDataInterface ? this.dataInterface.count : this.value.length
+      return this.tableData.length
+    },
+    columnCount() {
+      return this.tableData[0].length
     },
     renderedRowCount() {
       return Math.min(this.renderedRows, this.rowCount - this.startRow)
@@ -345,43 +431,11 @@ export default {
       if(Math.abs(this.selection.start.R -
       this.selection.end.R) == this.rowCount-1){
         return {
-          start: Math.min(this.selection.start.C,this.selection.end.C),
-          end: Math.max(this.selection.start.C,this.selection.end.C)
+          start: this.selectedRange.start.C,
+          end: this.selectedRange.end.C
         }
       }
       return null
-    },
-    underlayStyle(){
-      const lowestRow = Math.min(this.selection.start.R,this.selection.end.R)
-      const highestRow = Math.max(this.selection.start.R,this.selection.end.R)
-      let topOffset = 30*(lowestRow - this.startRow - 1)
-      if(topOffset < 0){
-        topOffset =0
-      }
-      if(topOffset>30*this.renderedRows){
-        topOffset = 30*this.renderedRows
-      }
-
-      let bottomOffset = 30*(highestRow - this.startRow - 1)
-      if(bottomOffset < 0){
-        bottomOffset =0
-      }
-      if(bottomOffset>30*this.renderedRows){
-        bottomOffset = 30*this.renderedRows
-      }
-      const height = 26+bottomOffset-topOffset
-      
-      return {
-        position: 'absolute',
-        top: topOffset+'px',
-        height: height+'px',
-        left: this.columnLeftOffset(Math.min(this.selection.start.C,this.selection.end.C)),
-        background: 'rgb(240,240,255)',
-        border: '0.1em solid rgb(180,180,255)',
-        lineHeight: '30px',
-        width: (6*(Math.abs(this.selection.start.C-this.selection.end.C)+1))-0.2+'em',
-        zIndex: '-1'
-      }
     }
   }
 }
@@ -389,13 +443,23 @@ export default {
 
 <style scoped>
 .table-container{
-  border:1px solid lime;
-  padding-left:2em;
+  border-bottom:1px solid lime;
   outline:none;
 }
 .table-body{
   overflow-y: scroll;
   position: relative;
   cursor: cell;
+}
+.the-input{
+  display: block;
+  height: 100%;
+  width: 100%;
+  outline: none;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 </style>

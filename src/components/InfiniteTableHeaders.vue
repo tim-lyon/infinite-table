@@ -2,7 +2,7 @@
   <div class="header-container" @mouseup="onMouseUp">
     <template v-for="(h, i) of headers">
       <div class="inner-container"
-        :class="{selected: isColumnSelected(i)}"
+        :style="headerStyle(i)"
         v-if="h.hasOwnProperty('children')"
         @mousedown.stop="onColumnMouseDown(columnRange(i))"
         @mouseover.stop="onColumnMouseOver(columnRange(i))"
@@ -10,6 +10,7 @@
       >
         <div>{{h.name}}</div>
         <InfiniteTableHeaders
+        :config="config"
         :headers="h.children"
         :startColumn="columnRange(i).start"
         :selectedColumns="selectedColumns"
@@ -18,7 +19,7 @@
         
       </div>
       <div v-else class="header-item"
-      :class="{selected: isColumnSelected(i)}"
+        :style="headerStyle(i)"
         @mousedown.stop="onColumnMouseDown(columnRange(i))"
         @mouseover.stop="onColumnMouseOver(columnRange(i))"
         :key="-i"
@@ -45,7 +46,8 @@ export default {
       type: Number,
       default: 1
     },
-    selectedColumns: Object
+    selectedColumns: Object,
+    config: Object,
   },
   data() {
     return {
@@ -101,6 +103,13 @@ export default {
       var range = this.columnRange(i)
       return range.start-1 >= this.selectedColumns.start &&
       range.end-1 <= this.selectedColumns.end
+    },
+    headerStyle(i){
+      const isSelected = this.isColumnSelected(i)
+      return {
+          background: isSelected ? this.config.style.selection.border.color : 'none',
+          borderColor: isSelected ? this.config.style.selection.border.color : '#aaa'
+      }
     }
   }
 }
@@ -133,9 +142,5 @@ export default {
 }
 .header-item>div{
   flex:1;
-}
-.selected {
-  background: rgb(180,180,255);
-  border-color: rgb(180,180,255);
 }
 </style>
