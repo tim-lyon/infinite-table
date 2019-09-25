@@ -74,6 +74,14 @@ const DEFAULT_CONFIG = {
     }
   }
 }
+
+const clamp = (value, min, max) => value < min ? min : value > max ? max : value
+
+function CellReference() {
+  this.R = 0
+  this.C = 0
+}
+
 export default {
   name: 'InfiniteTable',
   components: {
@@ -97,6 +105,24 @@ export default {
     },
     exports: {
       required: false
+    }
+  },
+  data(){
+    return {
+      referenceRow: {row: 0, scrollTop: 0},
+      lastScrollTop: 0,
+      renderedRows: ROW_COUNT+2*BUFFER_ROWS,
+      startRow: -1,
+      topBufferHeight: 0,
+      contentHeight: ROW_COUNT*ROW_HEIGHT,
+
+      isEditing: false,
+      isEndKeyPressed: false,
+      active: new CellReference(),
+      selection: {
+        start: new CellReference(),
+        end: new CellReference()
+      }
     }
   },
   methods: {
@@ -154,25 +180,31 @@ export default {
       return ret;
     },
     OnTableKeypress(){
+      const rowShift = this.isEndKeyPressed ? this.rowCount : 1
+      const columnShift = (this.isEndKeyPressed || event.key == 'Home') ? this.columnCount : 1
+      event.preventDefault()
       switch(event.key){
+        case 'Escape':
+          this.isEditing = false
+          this.OnArrow(0, 0)
+          break
         case 'ArrowDown':
-          this.OnArrow(0,1)
+          this.OnArrow(0, rowShift)
           break
         case 'ArrowUp':
-          this.OnArrow(0,-1)
+          this.OnArrow(0, -rowShift)
           break
         case 'ArrowLeft':
-          this.OnArrow(-1,0)
+        case 'Home':
+          this.OnArrow(-columnShift, 0)
           break
         case 'ArrowRight':
-          this.OnArrow(1,0)
+          this.OnArrow(columnShift, 0)
           break
         case 'Tab':
-          event.preventDefault()
           this.OnTab()
           break
         case 'Enter':
-          event.preventDefault()
           this.OnEnter()
           break
         case 'PageUp':
@@ -184,6 +216,7 @@ export default {
         default:
           this.isEditing = true
       }
+      this.isEndKeyPressed = event.key == 'End'
     },
     scrollToRow(iRow){
       const distanceFromReferenceRow = this.$refs.body.scrollTop-this.referenceRow.scrollTop
@@ -193,78 +226,57 @@ export default {
       iRow > firstFullyVisibleRow + ROW_COUNT - 2 ? ROW_COUNT : 0
       if(offset!=0){
         this.$refs.body.scrollTop = this.referenceRow.scrollTop +
-                (iRow-this.referenceRow.row-offset)*ROW_HEIGHT
+        (iRow-this.referenceRow.row-offset)*ROW_HEIGHT
       }
     },
-    OnArrow(dx, dy){
-      if(event.shiftKey){
-        this.selection.end.C += dx
-        this.selection.end.R += dy
+    OnArrow(dColumn, dRow, ignoreShiftKey){
+      if(event.shiftKey && !ignoreShiftKey){
+        this.selection.end.C += dColumn
+        this.selection.end.R += dRow
       }else{
-        this.selection.start.C += dx
-        this.selection.start.R += dy
-        this.selection.end.C = this.selection.start.C
-        this.selection.end.R = this.selection.start.R
-        this.setActiveRow(this.selection.start.R)
-        this.setActiveColumn(this.selection.start.C)
+        this.setActiveRow(this.active.R + dRow)
+        this.setActiveColumn(this.active.C + dColumn)
+        this.selection.start.R = this.active.R
+        this.selection.end.R = this.active.R
+        this.selection.start.C = this.active.C
+        this.selection.end.C = this.active.C
       }
       this.clampSelection()
       this.scrollToRow(this.selection.end.R)
     },
     OnTab(){
-      if(this.selection.start.R === this.selection.end.R &&
-      this.selection.start.C === this.selection.end.C){
-        this.OnArrow(1,0)
+      if(this.selectedCellCount == 1){
+        this.OnArrow(event.shiftKey ? -1 : 1, 0, true)
         return
       }
-      const newRow = this.active.C === this.selectedRange.end.C
-      this.setActiveColumn( newRow ? this.selectedRange.start.C : this.active.C + 1)
+      const last = event.shiftKey ? this.selectedRange.start : this.selectedRange.end
+      const first = event.shiftKey ? this.selectedRange.end : this.selectedRange.start
+      const newRow = this.active.C === last.C
+      this.setActiveColumn( newRow ? first.C : this.active.C + (event.shiftKey ? -1 : 1))
       if(newRow){
-        this.setActiveRow(this.active.R === this.selectedRange.end.R ?
-        this.selectedRange.start.R : this.active.R + 1)
+        this.setActiveRow(this.active.R === last.R ?
+        first.R : this.active.R + (event.shiftKey ? -1 : 1))
       }
     },
     OnEnter(){
-      if(this.selection.start.R === this.selection.end.R &&
-      this.selection.start.C === this.selection.end.C){
-        this.OnArrow(0,1)
+      if(this.selectedCellCount == 1){
+        this.OnArrow(0, event.shiftKey ? -1 : 1, true)
         return
       }
-      const newColumn = this.active.R === this.selectedRange.end.R
-      this.setActiveRow( newColumn ? this.selectedRange.start.R : this.active.R + 1)
+      const last = event.shiftKey ? this.selectedRange.start : this.selectedRange.end
+      const first = event.shiftKey ? this.selectedRange.end : this.selectedRange.start
+      const newColumn = this.active.R === last.R
+      this.setActiveRow( newColumn ? first.R : this.active.R + (event.shiftKey ? -1 : 1))
       if(newColumn){
-        this.setActiveColumn(this.active.C === this.selectedRange.end.C ?
-        this.selectedRange.start.C : this.active.C + 1)
+        this.setActiveColumn(this.active.C === last.C ?
+        first.C : this.active.C + (event.shiftKey ? -1 : 1))
       }
     },
     clampSelection(){
-      if(this.selection.start.R < 0){
-        this.selection.start.R = 0
-      }
-      else if(this.selection.start.R >= this.rowCount){
-        this.selection.start.R = this.rowCount - 1
-      }
-
-      if(this.selection.end.R < 0){
-        this.selection.end.R = 0
-      }
-      else if(this.selection.end.R >= this.rowCount){
-        this.selection.end.R = this.rowCount - 1
-      }
-
-      if(this.selection.start.C < 0){
-        this.selection.start.C = 0
-      }
-      else if(this.selection.start.C >= this.columnCount){
-        this.selection.start.C = this.columnCount - 1
-      }
-
-      if(this.selection.end.C < 0){
-        this.selection.end.C = 0
-      }
-      else if(this.selection.end.C >= this.columnCount){
-        this.selection.end.C = this.columnCount - 1
-      }
+      this.selection.start.R = clamp(this.selection.start.R, 0, this.rowCount - 1)
+      this.selection.end.R = clamp(this.selection.end.R, 0, this.rowCount - 1)
+      this.selection.start.C = clamp(this.selection.start.C, 0, this.columnCount - 1)
+      this.selection.end.C = clamp(this.selection.end.C, 0, this.columnCount - 1)
     },
     selectColumns(columns){
       if(!event.shiftKey){
@@ -340,43 +352,13 @@ export default {
       if(this.isEditing && iCol !== this.active.C){
         this.isEditing = false
       }
-      if(iCol >= 0 && iCol < this.columnCount){
-        this.active.C = iCol
-      }
+      this.active.C = clamp(iCol, 0, this.columnCount - 1)
     },
     setActiveRow(iRow){
       if(this.isEditing && iRow !== this.active.R){
         this.isEditing = false
       }
-      if(iRow >= 0 && iRow < this.rowCount){
-        this.active.R = iRow
-      }
-    }
-  },
-  data(){
-    return {
-      referenceRow: {row: 0, scrollTop: 0},
-      lastScrollTop: 0,
-      renderedRows: ROW_COUNT+2*BUFFER_ROWS,
-      startRow: -1,
-      topBufferHeight: 0,
-      contentHeight: ROW_COUNT*ROW_HEIGHT,
-
-      isEditing: false,
-      active: {
-        R: 0,
-        C: 0
-      },
-      selection: {
-        start: {
-          R:0,
-          C:0
-        },
-        end: {
-          R:0,
-          C:0
-        }
-      }
+      this.active.R = clamp(iRow, 0, this.rowCount - 1)
     }
   },
   computed: {
@@ -402,6 +384,10 @@ export default {
           C: Math.max(this.selection.start.C, this.selection.end.C)
         }
       }
+    },
+    selectedCellCount(){
+      return (1 + this.selectedRange.end.C - this.selectedRange.start.C) *
+      (1 + this.selectedRange.end.R - this.selectedRange.start.R)
     },
     computedHeaders() {
       if(Array.isArray(this.headers) || this.headers === undefined){
