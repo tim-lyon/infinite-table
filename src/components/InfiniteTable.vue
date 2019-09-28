@@ -11,19 +11,26 @@
       <div :style="{height: totalHeight+'px'}">
         <table :style="{position:'relative', top:topBufferHeight+'px', borderCollapse: 'collapse'}">
           <colgroup>
-            <col v-for="i of columnCount" :key="i" :style="columnStyle"/>
+            <col v-for="i of columnCount" :key="i"/>
           </colgroup>
-          <tr is="InfiniteTableRow"
-          v-for="i in renderedRowCount"
-          :config="config"
-          :row-index="i+startRow"
-          @input="setData($event, i+startRow)"
-          @cellMouseDown="onCellMouseDown"
-          @cellMouseOver="onCellMouseOver"
-          :data="rowData(i+startRow)"
-          :selected-range="selectedRange"
-          :active-cell="active"
-          :key="i+startRow" />
+          <tr
+          v-for="row in renderedRowArray"
+          :row-index="row"
+          :key="row - startRow" >
+            <td is="InfiniteTableCell"
+              v-for="column in columnCount"
+              :key="column"
+              :selected-range="selectedRange"
+              :active-cell="active"
+              :row-index="row"
+              :column-index="column -1"
+            >
+              <div class="cell-content"
+                @mousedown="onCellMouseDown({R: row, C: column -1})"
+                @mouseover="onCellMouseOver({R: row, C: column -1})"
+              >{{getCellValue(row, column -1)}}</div>
+            </td>
+          </tr>
         </table>
       </div>
     </div>
@@ -37,13 +44,12 @@
   <br><br>Selection: {{selection}}
   <br>Active: {{active}}
   <br>Editing: {{isEditing}}
-  <br>v: {{inputValue}}
 </div>
 </template>
 
 <script>
 import InfiniteTableHeaders from './InfiniteTableHeaders.vue'
-import InfiniteTableRow from './InfiniteTableRow.vue'
+import InfiniteTableCell from './InfiniteTableCell.vue'
 
 const ROW_HEIGHT = 30
 const BUFFER_ROWS = 5
@@ -86,7 +92,11 @@ export default {
   name: 'InfiniteTable',
   components: {
     InfiniteTableHeaders,
-    InfiniteTableRow
+    InfiniteTableCell
+  },
+  model: {
+    prop: 'tableData',
+    event: 'update'
   },
   props: {
     config: {
@@ -96,11 +106,19 @@ export default {
         return DEFAULT_CONFIG
       }
     },
+    columnCount: {
+      type: Number,
+      required: true
+    },
+    rowCount: {
+      type: Number,
+      required: true
+    },
     headers: {
       required: false
     },
     tableData: {
-      type: Array,
+      type: Object,
       required: true
     },
     exports: {
@@ -125,9 +143,20 @@ export default {
       }
     }
   },
+  created(){
+    this.hasGetFunction = this.tableData.hasOwnProperty('get')
+    this.hasSetFunction = this.tableData.hasOwnProperty('set')
+  },
   methods: {
-    rowData(iRow) {
-      return this.tableData[iRow]
+    getCellValue(row, column){
+      return this.hasGetFunction ? this.tableData.get(row, column) : this.tableData[row][column]
+    },
+    setCellValue(row, column, value){
+      if(this.hasSetFunction){
+        this.tableData.set(row, column, value)
+      }else{
+        this.$set(this.tableData[row], column, null)
+      }
     },
     startExport(exportFunction){
       exportFunction()
@@ -166,12 +195,6 @@ export default {
           C: column,
         }
       }
-    },
-    setData(data, row){
-        this.$emit('input', {
-          range: this.cellRange(row, data.column),
-          value: data.value
-        })
     },
     defaultColumnName(iCol) {
       for (var ret = '', a = 1, b = 26; (iCol -= a) >= 0; a = b, b *= 26) {
@@ -212,6 +235,9 @@ export default {
           break
         case 'PageDown':
           this.OnArrow(0,ROW_COUNT)
+          break
+        case 'Delete':
+          this.OnDelete()
           break
         default:
           this.isEditing = true
@@ -359,19 +385,18 @@ export default {
         this.isEditing = false
       }
       this.active.R = clamp(iRow, 0, this.rowCount - 1)
+    },
+    OnDelete(){
+      for(var row = this.selectedRange.start.R; row<=this.selectedRange.end.R; row++){
+        for(var column = this.selectedRange.start.C; column<=this.selectedRange.end.C; column++){
+          this.setCellValue(row, column, null)
+        }
+      }
     }
   },
   computed: {
-    columnStyle(){
-      const border = this.config.style.column.border
-      return {
-        borderWidth: '0 ' + border.width + 'px',
-        borderStyle: 'solid',
-        borderColor: border.color
-      }
-    },
-    inputValue() {
-      return this.tableData[this.active.R][this.active.C]
+    isModel(){
+      return this.$listeners.hasOwnProperty('update')
     },
     selectedRange(){
       return {
@@ -393,22 +418,26 @@ export default {
       if(Array.isArray(this.headers) || this.headers === undefined){
         return this.headers
       }
-      return this.tableData[0].map((cell, iCol) => {
-        return {name: this.defaultColumnName(iCol+1)}
-      })
+      let headers = []
+      for(var column = 0; column < this.columnCount; column++){
+        headers.push({name: this.defaultColumnName(column)})
+      }
+      return headers
     },
     computedExports(){
       return Array.isArray(this.exports) || this.exports === undefined ?
       this.exports : {CSV: this.exportCSV}
     },
-    rowCount() {
-      return this.tableData.length
-    },
-    columnCount() {
-      return this.tableData[0].length
-    },
     renderedRowCount() {
       return Math.min(this.renderedRows, this.rowCount - this.startRow)
+    },
+    renderedRowArray() {
+      let renderedRows = []
+      var currentRow = this.startRow+1
+      for(var i = 0; i < this.renderedRowCount; i ++){
+        renderedRows.push(currentRow++)
+      }
+      return renderedRows
     },
     totalHeight() {
       return Math.min(MAX_ROWS, this.rowCount)*ROW_HEIGHT
@@ -447,5 +476,16 @@ export default {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+}
+col {
+  border: 1px solid #aaa;
+}
+tr {
+  background: none;
+  border: 1px solid #aaa;
+  height: 30px;
+}
+.cell-content {
+  
 }
 </style>

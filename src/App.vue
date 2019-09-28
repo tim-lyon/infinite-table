@@ -3,16 +3,27 @@
     This is a table!
     <infinite-table
       :headers="headers"
-      :table-data="sampleData"
-      @input="inputRange"
-      @insert="insertRange"
-      @delete="deleteRange"
+      :row-count="10000"
+      :column-count="4"
+      :tableData="{rows: 10000, columns: 4, get: cellValue, set: setCellValue}"
+    />
+
+    <infinite-table
+      :headers="headers"
+      :row-count="10000"
+      :column-count="4"
+      v-model="sampleData"
     />
   </div>
 </template>
 
 <script>
 import InfiniteTable from './components/InfiniteTable.vue'
+
+var d = {}
+for(var i = 0; i < 10000; ++i){
+  d[i] = [i,"a","b","c"]
+}
 
 export default {
   name: 'app',
@@ -21,14 +32,7 @@ export default {
   },
   data() {
     return{
-      sampleData: [
-        ["a","b","c"],
-        ["a","b","c"],
-        ["a","b",false],
-        ["a","b","c"],
-        ["a","b","c"],
-        ["a","b","c"]
-      ],
+      sampleData: d,
       headers: [
         {name: "name", type:"string", children: [
             {name: "area"},
@@ -52,13 +56,11 @@ export default {
       console.log('inputRange')
       console.log(payload)
     },
-    insertRange(payload) {
-      console.log('insertRange')
-      console.log(payload)
+    cellValue(row, column){
+      return d[row][column]
     },
-    deleteRange(payload) {
-      console.log('deleteRange')
-      console.log(payload)
+    setCellValue(row, column, value){
+      d[row][column] = value
     }
   }
 }

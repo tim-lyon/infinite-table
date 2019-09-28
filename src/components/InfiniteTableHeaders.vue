@@ -1,8 +1,7 @@
 <template>
   <div class="header-container" @mouseup="onMouseUp">
     <template v-for="(h, i) of headers">
-      <div class="inner-container"
-        :style="headerStyle(i)"
+      <div :class="{innerContainer: true, selected: isColumnSelected(i)}"
         v-if="h.hasOwnProperty('children')"
         @mousedown.stop="onColumnMouseDown(columnRange(i))"
         @mouseover.stop="onColumnMouseOver(columnRange(i))"
@@ -18,8 +17,7 @@
         @mouseOverColumns="onColumnMouseOver"/>
         
       </div>
-      <div v-else class="header-item"
-        :style="headerStyle(i)"
+      <div v-else :class="{headerItem: true, selected: isColumnSelected(i)}"
         @mousedown.stop="onColumnMouseDown(columnRange(i))"
         @mouseover.stop="onColumnMouseOver(columnRange(i))"
         :key="-i"
@@ -48,11 +46,6 @@ export default {
     },
     selectedColumns: Object,
     config: Object,
-  },
-  data() {
-    return {
-      
-    }
   },
   methods: {
     selectColumnRange(range){
@@ -104,11 +97,9 @@ export default {
       return range.start-1 >= this.selectedColumns.start &&
       range.end-1 <= this.selectedColumns.end
     },
-    headerStyle(i){
-      const isSelected = this.isColumnSelected(i)
+    headerClass(i){
       return {
-          background: isSelected ? this.config.style.selection.border.color : 'none',
-          borderColor: isSelected ? this.config.style.selection.border.color : '#aaa'
+          selected: this.isColumnSelected(i)
       }
     }
   }
@@ -125,22 +116,27 @@ export default {
   user-select: none;
 }
 
-.inner-container{
+.innerContainer{
   display:flex;
   flex-direction: column;
   border-top: 1px solid #aaa;
 }
-.inner-container .header-container{
+.innerContainer .header-container{
   flex:1;
 }
-.header-item{
+.headerItem{
   min-width:6em;
   display: flex;
   align-items: center;
   border-bottom: 1px solid #aaa;
   border-top: 1px solid #aaa;
 }
-.header-item>div{
+.headerItem>div{
   flex:1;
+}
+.selected{
+  background:blue;
+  border-bottom: 1px solid blue;
+  border-top: 1px solid blue;
 }
 </style>

@@ -1,10 +1,7 @@
 <template>
-  <td :style="cellStyle">
-      <div class="cell"
-      :style="innerStyle"
-      @mousedown="$emit('cellMouseDown')"
-      @mouseover="$emit('cellMouseOver')">
-        {{value}}
+  <td :class="outerClass">
+      <div :class="innerClass">
+        <slot/>
       </div>
   </td>
 </template>
@@ -14,68 +11,25 @@
 export default {
   name: 'InfiniteTableCell',
   props: [
-    'config',
-    'value',
     'selectedRange',
-    'isActive',
+    'activeCell',
     'rowIndex',
     'columnIndex'
   ],
   computed: {
-    innerStyle(){
-      return {
-        borderTop: this.borderStyle(0),
-        borderRight: this.borderStyle(1),
-        borderBottom: this.borderStyle(2),
-        borderLeft: this.borderStyle(3),
-        padding: this.paddingWidths
-      }
+    isActive(){
+      return this.rowIndex == this.activeCell.R && this.columnIndex == this.activeCell.C
     },
-    cellStyle(){
-      let style = {
-        background: this.isSelected && !this.isActive ? this.config.style.selection.fill.color : 'none',
-        padding: 0
-      }
-      const color = this.fence.color
-      let width = this.config.style.row.border.width
-      let border = width + 'px solid ' + color
-      if(this.isTop || this.isSelected){
-        style.borderTop = border
-      }
-      if(this.isBottom || this.isSelected){
-        style.borderBottom = border
-      }
-      width = this.config.style.column.border.width
-      border = width + 'px solid ' + color
-      if(this.isLeft || this.isSelected){
-        style.borderLeft = border
-      }
-      if(this.isRight || this.isSelected){
-        style.borderRight = border
-      }
-      return style
+    isInSelectedRowRange(){
+      return this.rowIndex >= this.selectedRange.start.R &&
+      this.rowIndex <= this.selectedRange.end.R
     },
-    fence(){
-      return this.config.style.selection.border
+    isInSelectedColumnRange(){
+      return this.columnIndex >= this.selectedRange.start.C &&
+      this.columnIndex <= this.selectedRange.end.C
     },
-    borderWidths(){
-      return [
-        this.isTop ? this.fence.width : 0,
-        this.isRight ? this.fence.width : 0,
-        this.isBottom ? this.fence.width : 0,
-        this.isLeft ? this.fence.width : 0
-      ]
-    },
-    paddingWidths(){
-      return this.borderWidths.map(x => this.fence.width-x).join('px ') + 'px';
-    },
-    borderColors(){
-      return [
-        this.fence.color,
-        this.isRight ? this.fence.color : this.config.style.column.border.color,
-        this.isBottom ? this.fence.color: this.config.style.row.border.color,
-        this.fence.color
-      ]
+    isSelected(){
+      return this.isInSelectedRowRange && this.isInSelectedColumnRange
     },
     isLeft(){
       return this.isInSelectedRowRange &&
@@ -93,30 +47,67 @@ export default {
       return this.isInSelectedColumnRange &&
       this.rowIndex === this.selectedRange.end.R;
     },
-    isInSelectedRowRange(){
-      return this.rowIndex >= this.selectedRange.start.R &&
-      this.rowIndex <= this.selectedRange.end.R
+    innerClass(){
+      return {
+        cell: true,
+        top: this.isTop,
+        right: this.isRight,
+        bottom: this.isBottom,
+        left: this.isLeft,
+        highlight: this.isSelected && !this.isActive
+      }
     },
-    isInSelectedColumnRange(){
-      return this.columnIndex >= this.selectedRange.start.C &&
-      this.columnIndex <= this.selectedRange.end.C
-    },
-    isSelected(){
-      return this.isInSelectedRowRange && this.isInSelectedColumnRange
-    }
-  },
-  methods: {
-    borderStyle(i){
-      return this.borderWidths[i] + 'px solid ' + this.borderColors[i]
+    outerClass(){
+      return {
+        outer: true,
+        selected: this.isSelected
+      }
     }
   }
 }
 </script>
 
 <style>
+
+.outer{
+  padding:0;
+}
+
+.outer.selected{
+  border:1px solid rgb(0, 135, 189);
+}
+
 .cell{
   width:6em;
   box-sizing: border-box;
+  height: 30px;
+  background:none;
+  padding:1px;
+  border:0px solid rgb(0, 135, 189);
+}
+
+.cell.top{
+  border-top-width: 1px;
+  padding-top: 0;
+}
+
+.cell.right{
+  border-right-width: 1px;
+  padding-right: 0;
+}
+
+.cell.bottom{
+  border-bottom-width: 1px;
+  padding-bottom: 0;
+}
+
+.cell.left{
+  border-left-width: 1px;
+  padding-left: 0;
+}
+
+.cell.highlight{
+  background: rgba(0, 135, 189, .13);
 }
 
 ::selection {
