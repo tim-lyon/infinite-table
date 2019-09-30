@@ -1,35 +1,19 @@
 <template>
-  <div class="header-container" @mouseup="onMouseUp">
-    <template v-for="(h, i) of headers">
-      <div :class="{innerContainer: true, selected: isColumnSelected(i)}"
-        v-if="h.hasOwnProperty('children')"
-        @mousedown.stop="onColumnMouseDown(columnRange(i))"
-        @mouseover.stop="onColumnMouseOver(columnRange(i))"
-        :key=i
+  <table>
+    <tr v-for="row of rowCount" :key="row">
+      <td
+        v-for="(cell, index) of headerCells[row-1]"
+        :key="index"
+        :colspan="cell.colspan"
+        :rowspan="cell.rowspan"
+        :class="{selected: isColumnSelected(cell)}"
+        @mousedown.stop="onColumnMouseDown({start: cell.column, end:cell.column + cell.colspan-1})"
+        @mouseover.stop="onColumnMouseOver({start: cell.column, end:cell.column + cell.colspan-1})"
       >
-        <div>{{h.name}}</div>
-        <InfiniteTableHeaders
-        :config="config"
-        :headers="h.children"
-        :startColumn="columnRange(i).start"
-        :selectedColumns="selectedColumns"
-        @selectColumnRange="selectColumnRange"
-        @mouseOverColumns="onColumnMouseOver"/>
-        
-      </div>
-      <div v-else :class="{headerItem: true, selected: isColumnSelected(i)}"
-        @mousedown.stop="onColumnMouseDown(columnRange(i))"
-        @mouseover.stop="onColumnMouseOver(columnRange(i))"
-        :key="-i"
-      >
-        <div>
-          {{h.name}}
-          <span v-if="h.hasOwnProperty('unit')">({{h.unit}})</span>
-        </div>
-      </div>
-      
-    </template>
-  </div>
+        {{cell.name}}
+      </td>
+    </tr>
+  </table>
 </template>
 
 <script>
@@ -40,14 +24,52 @@ export default {
   name: 'InfiniteTableHeaders',
   props: {
     headers: Array,
-    startColumn: {
-      type: Number,
-      default: 1
-    },
     selectedColumns: Object,
-    config: Object,
+  },
+  computed: {
+    headerCells() {
+      var headers = {}
+      this.getHeaderRow(this.headers, 0, 0, headers)
+      const rowCount = Object.keys(headers).length
+      for(var row = 0; row < rowCount; row++){
+        for(var cell of headers[row]){
+          cell.rowspan = 1 + rowCount - cell.depth - row
+          cell.rowspan = cell.depth == 1 ? (rowCount - row) : 1
+        }
+      }
+      return headers
+    },
+    rowCount(){
+      return Object.keys(this.headerCells).length
+    }
   },
   methods: {
+    getHeaderRow(header, row, column, result){
+      for(const h of header){
+        if(!result.hasOwnProperty(row)){
+          result[row] = []
+        }
+        const colspan = this.numberOfColumns(h)
+        result[row].push({
+          name: h.name,
+          type: h.type,
+          column: column,
+          colspan: colspan,
+          depth: this.depthOf(h)
+        })
+        if(h.hasOwnProperty('children')){
+          this.getHeaderRow(h.children, row+1, column, result)
+        }
+        column += colspan
+      }
+    },
+    depthOf(header){
+      let depth = 1
+      if(header.hasOwnProperty('children')){
+        depth += header.children.reduce((a, b) => Math.max(this.depthOf(a), this.depthOf(b)))
+      }
+      return depth
+    },
     selectColumnRange(range){
       this.$emit('selectColumnRange', range)
     },
@@ -68,75 +90,35 @@ export default {
     onMouseUp(){
       mouseDownColumns = false
     },
-    columnRange(i){
-      let iNow = 0
-      let count = 0
-      let childCount = 0
-      for(var header of this.headers){
-        if(i==iNow){
-          childCount = this.numberOfColumns(header)
-          break
-        }
-        ++iNow
-        count += this.numberOfColumns(header)
-      }
-      return {
-        start: count+this.startColumn,
-        end: count+this.startColumn+childCount-1
-      }
-    },
     numberOfColumns(header){
       if(header.hasOwnProperty('children')){
         return header.children.reduce((count, h) => count + this.numberOfColumns(h), 0);
       }
       return 1
     },
-    isColumnSelected(i){
+    isColumnSelected(cell){
       if(!this.selectedColumns) return false
-      var range = this.columnRange(i)
-      return range.start-1 >= this.selectedColumns.start &&
-      range.end-1 <= this.selectedColumns.end
-    },
-    headerClass(i){
-      return {
-          selected: this.isColumnSelected(i)
-      }
+      return cell.column >= this.selectedColumns.start &&
+      (cell.column + cell.colspan - 1) <= this.selectedColumns.end
     }
   }
 }
 </script>
 
 <style scoped>
-.header-container{
-  display:flex;
-  align-items: stretch;
-  text-align: center;
-  cursor:cell;
-  color:rgba(0,0,0,0.54);
-  user-select: none;
-}
-
-.innerContainer{
-  display:flex;
-  flex-direction: column;
-  border-top: 1px solid #aaa;
-}
-.innerContainer .header-container{
-  flex:1;
-}
-.headerItem{
-  min-width:6em;
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid #aaa;
-  border-top: 1px solid #aaa;
-}
-.headerItem>div{
-  flex:1;
-}
 .selected{
-  background:blue;
-  border-bottom: 1px solid blue;
-  border-top: 1px solid blue;
+  background:rgb(0, 135, 189);
+  border: 1px solid rgb(0, 135, 189);
+}
+table {
+  border-collapse: collapse;
+}
+td {
+  min-width: 6em;
+  width: 6em;
+  border:1px solid #aaa;
+  text-align: center;
+  line-height: 1.3em;
+  padding: 0;
 }
 </style>

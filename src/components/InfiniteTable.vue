@@ -2,7 +2,6 @@
 <div>
   <div class="table-container" tabindex="1" @keydown="OnTableKeypress">
     <InfiniteTableHeaders
-      :config="config"
       :headers="computedHeaders"
       :selectedColumns="selectedColumns"
       @selectColumnRange="selectColumns"
@@ -28,22 +27,15 @@
               <div class="cell-content"
                 @mousedown="onCellMouseDown({R: row, C: column -1})"
                 @mouseover="onCellMouseOver({R: row, C: column -1})"
-              >{{getCellValue(row, column -1)}}</div>
+              >
+                {{getCellValue(row, column -1)}}
+              </div>
             </td>
           </tr>
         </table>
       </div>
     </div>
   </div>
-  <div>
-    <button v-for="(exportFunction, name) in computedExports" :key="name" @click="startExport(exportFunction)">
-      Export {{name}}
-    </button>
-  </div>
-
-  <br><br>Selection: {{selection}}
-  <br>Active: {{active}}
-  <br>Editing: {{isEditing}}
 </div>
 </template>
 
@@ -55,31 +47,6 @@ const ROW_HEIGHT = 30
 const BUFFER_ROWS = 5
 const ROW_COUNT = 12
 const MAX_ROWS = 100000
-const DEFAULT_CONFIG = {
-  style: {
-    row: {
-      border: {
-        color: '#aaa',
-        width: 1
-      }
-    },
-    column: {
-      border: {
-        color: '#aaa',
-        width: 1
-      }
-    },
-    selection: {
-      border: {
-        color: 'rgb(0, 135, 189)',
-        width: 1
-      },
-      fill: {
-        color: 'rgba(0, 135, 189, .13)'
-      }
-    }
-  }
-}
 
 const clamp = (value, min, max) => value < min ? min : value > max ? max : value
 
@@ -99,13 +66,6 @@ export default {
     event: 'update'
   },
   props: {
-    config: {
-      type: Object,
-      required: false,
-      default() {
-        return DEFAULT_CONFIG
-      }
-    },
     columnCount: {
       type: Number,
       required: true
@@ -120,9 +80,6 @@ export default {
     tableData: {
       type: Object,
       required: true
-    },
-    exports: {
-      required: false
     }
   },
   data(){
@@ -157,32 +114,6 @@ export default {
       }else{
         this.$set(this.tableData[row], column, null)
       }
-    },
-    startExport(exportFunction){
-      exportFunction()
-    },
-    exportCSV(){
-      let csvFile = "data:text/csv;charset=utf-8,";
-      for(var iRow = 1; iRow <= this.rowCount; iRow++){
-        const rowArray = this.rowData[iRow].map(fieldValue => {
-          var value = fieldValue.hasOwnProperty('value') ? fieldValue.value : fieldValue
-          var string = value.toString().replace(/"/g, '""')
-          if (string.search(/("|,|\n)/g) >= 0){
-            string = '"' + string + '"'
-          }
-          return string
-        })
-        csvFile += rowArray.join(",") + "\r\n";
-      }
-      var blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
-      var url = URL.createObjectURL(blob);
-      var link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", "export.csv");
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
     },
     cellRange(row, column){
       return {
@@ -306,9 +237,9 @@ export default {
     },
     selectColumns(columns){
       if(!event.shiftKey){
-        this.selection.start.C = columns.start - 1
+        this.selection.start.C = columns.start
       }
-      this.selection.end.C = columns.end - 1
+      this.selection.end.C = columns.end
       this.selection.start.R = 0
       this.selection.end.R = this.rowCount - 1
     },
@@ -395,9 +326,6 @@ export default {
     }
   },
   computed: {
-    isModel(){
-      return this.$listeners.hasOwnProperty('update')
-    },
     selectedRange(){
       return {
         start: {
@@ -423,10 +351,6 @@ export default {
         headers.push({name: this.defaultColumnName(column)})
       }
       return headers
-    },
-    computedExports(){
-      return Array.isArray(this.exports) || this.exports === undefined ?
-      this.exports : {CSV: this.exportCSV}
     },
     renderedRowCount() {
       return Math.min(this.renderedRows, this.rowCount - this.startRow)
@@ -479,13 +403,16 @@ export default {
 }
 col {
   border: 1px solid #aaa;
+  border-top: 1px solid white;;
 }
 tr {
   background: none;
   border: 1px solid #aaa;
+  border-top-width: 0px;
   height: 30px;
 }
 .cell-content {
-  
+  height:30px;
+  line-height: 30px;
 }
 </style>

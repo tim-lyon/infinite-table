@@ -4,7 +4,7 @@
     <infinite-table
       :headers="headers"
       :row-count="10000"
-      :column-count="4"
+      :column-count="7"
       :tableData="{rows: 10000, columns: 4, get: cellValue, set: setCellValue}"
     />
 
@@ -60,7 +60,7 @@ export default {
       return d[row][column]
     },
     setCellValue(row, column, value){
-      d[row][column] = value
+      this.$set(d[row], column, value)
     }
   }
 }

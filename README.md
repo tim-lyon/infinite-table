@@ -84,37 +84,3 @@ The `infinite-table` component will emit the following events which, if subscrib
 |`delete-row`|Delete row range (as above)
 |`insert-column`|Insert column range `{column:#, count:#}`
 |`delete-column`|Delete column range (as above)
-
-## Export data
-By default, `infinite-table` will include an "Export CSV" option. This can be disabled by adding the prop `exports="false"`. Alternatively, the default export functionality can be extended (and overriden) by passing an `exports` object with each property representing a custom export function. The function will be called without parameters - the implementation should export the entire data range.
-```javascript
-let myExports = {
-    CSV: myCsvExportFunction,
-    PDF: myPdfExportFunction
-}
-```
-```html
-<infinite-table :exports="myExports" />
-```
-
-## Configuration
-The `infinite-table` component can be configued by passing a `config` prop with optional configurations as follows
-
-```javascript
-config = {
-    style: {
-        row: {
-            background: ['red','blue','green'], // color or array or repeating colours
-            border: 'black'
-        },
-        selection: {
-            border: {
-                color: 'blue'
-            },
-            fill: {
-                color: 'pink'
-            }
-        }
-    }
-}
-```

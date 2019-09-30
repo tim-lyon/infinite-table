@@ -78,7 +78,7 @@ export default {
 }
 
 .cell{
-  width:6em;
+  width: 6em;
   box-sizing: border-box;
   height: 30px;
   background:none;
