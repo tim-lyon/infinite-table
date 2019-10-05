@@ -5,13 +5,12 @@
       :headers="headers"
       :row-count="10000"
       :column-count="7"
-      :tableData="{rows: 10000, columns: 4, get: cellValue, set: setCellValue}"
+      :tableData="{rows: 10000, columns: 4, get: cellValue, set: setRangeValue}"
     />
 
     <infinite-table
-      :headers="headers"
       :row-count="10000"
-      :column-count="4"
+      :column-count="6"
       v-model="sampleData"
     />
   </div>
@@ -59,8 +58,13 @@ export default {
     cellValue(row, column){
       return d[row][column]
     },
-    setCellValue(row, column, value){
-      this.$set(d[row], column, value)
+    setRangeValue(range, value) {
+      console.log(range)
+      for(var row = range.start.R; row <= range.end.R; row++){
+        for(var column = range.start.C; column <= range.end.C; column++){
+          this.$set(d[row], column, value)
+        }
+      }
     }
   }
 }

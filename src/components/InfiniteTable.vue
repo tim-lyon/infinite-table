@@ -1,39 +1,50 @@
 <template>
-<div>
-  <div class="table-container" tabindex="1" @keydown="OnTableKeypress">
-    <InfiniteTableHeaders
-      :headers="computedHeaders"
-      :selectedColumns="selectedColumns"
-      @selectColumnRange="selectColumns"
-    />
-    <div class="table-body" ref="body" :style="{height:contentHeight+'px'}" @scroll="scrollTable">
-      <div :style="{height: totalHeight+'px'}">
-        <table :style="{position:'relative', top:topBufferHeight+'px', borderCollapse: 'collapse'}">
-          <colgroup>
-            <col v-for="i of columnCount" :key="i"/>
-          </colgroup>
-          <tr
-          v-for="row in renderedRowArray"
-          :row-index="row"
-          :key="row - startRow" >
-            <td is="InfiniteTableCell"
-              v-for="column in columnCount"
-              :key="column"
-              :selected-range="selectedRange"
-              :active-cell="active"
-              :row-index="row"
-              :column-index="column -1"
+<div class="table-container" tabindex="1" @keydown.self="OnTableKeypress">
+  <InfiniteTableHeaders
+    style="margin-left:50px;"
+    :headers="computedHeaders"
+    :selectedColumns="selectedColumns"
+    :allRowsSelected="allRowsSelected"
+    @selectColumnRange="selectColumns"
+  />
+  <div class="table-body" ref="body" :style="{height:contentHeight+'px'}" @scroll="scrollTable">
+    <div :style="{height: totalHeight+'px'}">
+      <table :style="{position:'relative', top:topBufferHeight+'px', borderCollapse: 'collapse'}">
+        <colgroup>
+          <col v-for="i of columnCount" :key="i"/>
+        </colgroup>
+        <tr
+        v-for="row in renderedRowArray"
+        :row-index="row"
+        :key="row - startRow" >
+          <th :class="{rowId: true, active: row >= selectedRows.start && row <= selectedRows.end, selected: allColumnsSelected }"
+            @mousedown="onCellMouseDown({R: row, C: -1})"
+            @mouseover="onCellMouseOver({R: row, C: -1})"
+          >
+            {{row}}
+            </th>
+          <td is="InfiniteTableCell"
+            v-for="column in columnCount"
+            :key="column"
+            :selected-range="selectedRange"
+            :active-cell="active"
+            :row-index="row"
+            :column-index="column -1"
+            @mousedown="onCellMouseDown({R: row, C: column -1})"
+            @mouseover="onCellMouseOver({R: row, C: column -1})"
+            @dblclick="onCellDblClick({R: row, C: column -1})"
+          >
+            <input v-if="isEditing && active.R == row && active.C == column - 1"
+              type="text"
+              class="the-input"
+              v-model="inputValue"
+              ref="theinput"
+              @keydown="onInputKeypress"
             >
-              <div class="cell-content"
-                @mousedown="onCellMouseDown({R: row, C: column -1})"
-                @mouseover="onCellMouseOver({R: row, C: column -1})"
-              >
-                {{getCellValue(row, column -1)}}
-              </div>
-            </td>
-          </tr>
-        </table>
-      </div>
+            <div v-else class="the-input">{{getCellValue(row, column -1)}}</div>
+          </td>
+        </tr>
+      </table>
     </div>
   </div>
 </div>
@@ -51,8 +62,8 @@ const MAX_ROWS = 100000
 const clamp = (value, min, max) => value < min ? min : value > max ? max : value
 
 function CellReference() {
-  this.R = 0
-  this.C = 0
+  this.R = -1
+  this.C = -1
 }
 
 export default {
@@ -75,7 +86,18 @@ export default {
       required: true
     },
     headers: {
-      required: false
+      required: false,
+      default: true
+    },
+    selectable: {
+      type: Boolean,
+      required: false,
+      default: true
+    },
+    editable: {
+      type: Boolean,
+      required: false,
+      default: true
     },
     tableData: {
       type: Object,
@@ -90,8 +112,11 @@ export default {
       startRow: -1,
       topBufferHeight: 0,
       contentHeight: ROW_COUNT*ROW_HEIGHT,
-
       isEditing: false,
+      isDeepEditing: false,
+      isSelectable: true,
+      isEditable: true,
+      inputValue: '',
       isEndKeyPressed: false,
       active: new CellReference(),
       selection: {
@@ -103,16 +128,22 @@ export default {
   created(){
     this.hasGetFunction = this.tableData.hasOwnProperty('get')
     this.hasSetFunction = this.tableData.hasOwnProperty('set')
+    this.isEditable = this.editable
+    this.isSelectable = this.selectable || this.editable
   },
   methods: {
     getCellValue(row, column){
       return this.hasGetFunction ? this.tableData.get(row, column) : this.tableData[row][column]
     },
-    setCellValue(row, column, value){
+    setRangeValue(range, value){
       if(this.hasSetFunction){
-        this.tableData.set(row, column, value)
+        this.tableData.set(range, value)
       }else{
-        this.$set(this.tableData[row], column, null)
+        for(var row = range.start.R; row <= range.end.R; row++){
+          for(var column = range.start.C; column <= range.end.C; column++){
+            this.$set(this.tableData[row], column, value)
+          }
+        }
       }
     },
     cellRange(row, column){
@@ -136,44 +167,83 @@ export default {
     OnTableKeypress(){
       const rowShift = this.isEndKeyPressed ? this.rowCount : 1
       const columnShift = (this.isEndKeyPressed || event.key == 'Home') ? this.columnCount : 1
-      event.preventDefault()
       switch(event.key){
         case 'Escape':
-          this.isEditing = false
+          this.endEdit()
           this.OnArrow(0, 0)
           break
         case 'ArrowDown':
+          event.preventDefault() // stop window scrolling
           this.OnArrow(0, rowShift)
           break
         case 'ArrowUp':
+          event.preventDefault() // stop window scrolling
           this.OnArrow(0, -rowShift)
           break
         case 'ArrowLeft':
         case 'Home':
+          event.preventDefault() // stop window scrolling
           this.OnArrow(-columnShift, 0)
           break
         case 'ArrowRight':
+          event.preventDefault() // stop window scrolling
           this.OnArrow(columnShift, 0)
           break
         case 'Tab':
+          event.preventDefault() // stop table losing focus
           this.OnTab()
           break
         case 'Enter':
+          event.preventDefault() // stop window scrolling
           this.OnEnter()
           break
         case 'PageUp':
+          event.preventDefault() // stop window scrolling
           this.OnArrow(0,-ROW_COUNT)
           break
         case 'PageDown':
+          event.preventDefault() // stop window scrolling
           this.OnArrow(0,ROW_COUNT)
           break
         case 'Delete':
           this.OnDelete()
+          break;
+        case 'Backspace':
+          this.OnDelete()
+          this.startEdit()
           break
+        case 'F2':
+          this.startEdit()
+          break
+        case 'a':
+          if(event.ctrlKey){
+            this.selectAll()
+            break
+          }
         default:
-          this.isEditing = true
+          if(!this.isEditing && event.key.length == 1) {
+            this.startEdit(true)
+          }
       }
       this.isEndKeyPressed = event.key == 'End'
+      if(this.isEndKeyPressed){
+        event.preventDefault() // stop window scrolling
+      }
+    },
+    onInputKeypress(){
+      switch(event.key){
+        case 'Escape':
+          this.cancelEdit()
+          this.OnArrow(0, 0)
+          break
+        case 'ArrowLeft':
+        case 'ArrowRight':
+          if(this.isDeepEditing){
+            return
+          }
+        default:
+          this.OnTableKeypress()
+      }
     },
     scrollToRow(iRow){
       const distanceFromReferenceRow = this.$refs.body.scrollTop-this.referenceRow.scrollTop
@@ -216,6 +286,9 @@ export default {
       }
     },
     OnEnter(){
+      if(this.isEditing){
+        this.endEdit(event.ctrlKey)
+      }
       if(this.selectedCellCount == 1){
         this.OnArrow(0, event.shiftKey ? -1 : 1, true)
         return
@@ -229,11 +302,18 @@ export default {
         first.C : this.active.C + (event.shiftKey ? -1 : 1))
       }
     },
+    selectAll(){
+      this.selection.start.R = 0
+      this.selection.end.R = this.rowCount - 1
+      this.selection.start.C = 0
+      this.selection.end.C = this.columnCount - 1
+    },
     clampSelection(){
       this.selection.start.R = clamp(this.selection.start.R, 0, this.rowCount - 1)
       this.selection.end.R = clamp(this.selection.end.R, 0, this.rowCount - 1)
       this.selection.start.C = clamp(this.selection.start.C, 0, this.columnCount - 1)
       this.selection.end.C = clamp(this.selection.end.C, 0, this.columnCount - 1)
+      console.log(this.selection.start.R)
     },
     selectColumns(columns){
       if(!event.shiftKey){
@@ -283,13 +363,24 @@ export default {
       this.lastScrollTop = scrollTop
     },
     onCellMouseDown(cell){
-      if(this.isEditing && cell.C !== this.active.C){
-        this.isEditing = false
+      if(this.isEditing) {
+        if(cell.C === this.active.C && cell.R === this.active.R){
+          this.isDeepEditing = true
+        }
+        else {
+          this.endEdit()
+        }
       }
-      this.selection.end.C = cell.C
-      if(!event.shiftKey){
-        this.selection.start.C = cell.C
-        this.setActiveColumn(cell.C)
+
+      if(cell.C == -1){
+        this.selection.start.C = 0
+        this.selection.end.C = this.columnCount - 1
+      }else{
+        this.selection.end.C = cell.C
+        if(!event.shiftKey){
+          this.selection.start.C = cell.C
+          this.setActiveColumn(cell.C)
+        }
       }
 
       this.selection.end.R = cell.R
@@ -301,32 +392,65 @@ export default {
     },
     onCellMouseOver(cell){
       if(event.buttons == 1){
-        this.selection.end.C = cell.C
+        if(cell.C > 0){
+          this.selection.end.C = cell.C
+        }
+        
         this.selection.end.R = cell.R
       }
     },
+    onCellDblClick(cell) {
+      this.startEdit()
+    },
     setActiveColumn(iCol){
       if(this.isEditing && iCol !== this.active.C){
-        this.isEditing = false
+        this.endEdit()
       }
       this.active.C = clamp(iCol, 0, this.columnCount - 1)
     },
     setActiveRow(iRow){
       if(this.isEditing && iRow !== this.active.R){
-        this.isEditing = false
+        this.endEdit()
       }
       this.active.R = clamp(iRow, 0, this.rowCount - 1)
     },
     OnDelete(){
-      for(var row = this.selectedRange.start.R; row<=this.selectedRange.end.R; row++){
-        for(var column = this.selectedRange.start.C; column<=this.selectedRange.end.C; column++){
-          this.setCellValue(row, column, null)
-        }
+      if(this.isEditable){
+        this.setRangeValue(this.selectedRange, null)
       }
+    },
+    startEdit(resetValue) {
+      if(!this.isEditable) return
+      this.inputValue = resetValue ? '' : this.getCellValue(this.active.R, this.active.C)
+      this.isEditing = true
+      this.isDeepEditing = !resetValue
+      this.$nextTick(()=>
+        this.$refs.theinput[0].focus()
+      )
+    },
+    endEdit(fillSelection) {
+      if(fillSelection) {
+        this.setRangeValue(this.selectedRange, this.inputValue)
+      }
+      else {
+        this.setRangeValue(this.cellRange(this.active.R, this.active.C), this.inputValue)
+      }
+      this.cancelEdit()
+    },
+    cancelEdit(){
+      this.isEditing = false
+      this.isDeepEditing = false
+      this.$el.focus()
     }
   },
   computed: {
     selectedRange(){
+      if(!this.isSelectable){
+        return {
+          start: new CellReference(),
+          end: new CellReference()
+        }
+      }
       return {
         start: {
           R: Math.min(this.selection.start.R, this.selection.end.R),
@@ -343,11 +467,11 @@ export default {
       (1 + this.selectedRange.end.R - this.selectedRange.start.R)
     },
     computedHeaders() {
-      if(Array.isArray(this.headers) || this.headers === undefined){
+      if(Array.isArray(this.headers) || this.headers == false || this.headers == 'false'){
         return this.headers
       }
       let headers = []
-      for(var column = 0; column < this.columnCount; column++){
+      for(var column = 1; column <= this.columnCount; column++){
         headers.push({name: this.defaultColumnName(column)})
       }
       return headers
@@ -366,15 +490,25 @@ export default {
     totalHeight() {
       return Math.min(MAX_ROWS, this.rowCount)*ROW_HEIGHT
     },
+    allRowsSelected() {
+      return this.selection.start.R == 0 &&
+        this.selection.end.R  == this.rowCount-1
+    },
+    allColumnsSelected() {
+      return this.selection.start.C == 0 &&
+        this.selection.end.C  == this.columnCount-1
+    },
     selectedColumns(){
-      if(Math.abs(this.selection.start.R -
-      this.selection.end.R) == this.rowCount-1){
-        return {
-          start: this.selectedRange.start.C,
-          end: this.selectedRange.end.C
-        }
+      return {
+        start: this.selectedRange.start.C,
+        end: this.selectedRange.end.C
       }
-      return null
+    },
+    selectedRows(){
+      return {
+        start: this.selectedRange.start.R,
+        end: this.selectedRange.end.R
+      }
     }
   }
 }
@@ -386,17 +520,17 @@ export default {
   outline:none;
 }
 .table-body{
+  border-top: 1px solid #aaa;
   overflow-y: scroll;
   position: relative;
   cursor: cell;
 }
+
 .the-input{
   display: block;
-  height: 100%;
-  width: 100%;
   outline: none;
   border: none;
-  background: none;
+  padding:0;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
@@ -409,10 +543,22 @@ tr {
   background: none;
   border: 1px solid #aaa;
   border-top-width: 0px;
-  height: 30px;
 }
-.cell-content {
-  height:30px;
-  line-height: 30px;
+td {
+  margin: auto;
+}
+th {
+  color:rgba(0,0,0,0.54);
+  font-weight: inherit;
+}
+
+.rowId{
+  width: 48px;
+}
+.rowId.active {
+  //background: rgba(0, 135, 189, .1);
+}
+.rowId.active.selected {
+  //background: #aaa
 }
 </style>

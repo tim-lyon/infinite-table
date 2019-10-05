@@ -1,5 +1,5 @@
 <template>
-  <td :class="outerClass">
+  <td :class="outerClass" @mousedown="$emit('mousedown')" @mouseover="$emit('mouseover')" @dblclick="$emit('dblclick')">
       <div :class="innerClass">
         <slot/>
       </div>
@@ -18,7 +18,8 @@ export default {
   ],
   computed: {
     isActive(){
-      return this.rowIndex == this.activeCell.R && this.columnIndex == this.activeCell.C
+      return this.rowIndex == this.activeCell.R &&
+      this.columnIndex == this.activeCell.C
     },
     isInSelectedRowRange(){
       return this.rowIndex >= this.selectedRange.start.R &&
@@ -29,7 +30,8 @@ export default {
       this.columnIndex <= this.selectedRange.end.C
     },
     isSelected(){
-      return this.isInSelectedRowRange && this.isInSelectedColumnRange
+      return this.isInSelectedRowRange &&
+      this.isInSelectedColumnRange
     },
     isLeft(){
       return this.isInSelectedRowRange &&
@@ -71,6 +73,7 @@ export default {
 
 .outer{
   padding:0;
+  overflow: hidden;
 }
 
 .outer.selected{
@@ -80,10 +83,10 @@ export default {
 .cell{
   width: 6em;
   box-sizing: border-box;
-  height: 30px;
   background:none;
   padding:1px;
   border:0px solid rgb(0, 135, 189);
+  height:30px;
 }
 
 .cell.top{

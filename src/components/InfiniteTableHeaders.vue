@@ -6,7 +6,7 @@
         :key="index"
         :colspan="cell.colspan"
         :rowspan="cell.rowspan"
-        :class="{selected: isColumnSelected(cell)}"
+        :class="{selected: isColumnSelected(cell), active: isColumnActive(cell)}"
         @mousedown.stop="onColumnMouseDown({start: cell.column, end:cell.column + cell.colspan-1})"
         @mouseover.stop="onColumnMouseOver({start: cell.column, end:cell.column + cell.colspan-1})"
       >
@@ -25,6 +25,7 @@ export default {
   props: {
     headers: Array,
     selectedColumns: Object,
+    allRowsSelected: Boolean,
   },
   computed: {
     headerCells() {
@@ -96,8 +97,13 @@ export default {
       }
       return 1
     },
-    isColumnSelected(cell){
+    isColumnActive(cell){
       if(!this.selectedColumns) return false
+      return cell.column >= this.selectedColumns.start &&
+      (cell.column + cell.colspan - 1) <= this.selectedColumns.end
+    },
+    isColumnSelected(cell){
+      if(!this.allRowsSelected || !this.selectedColumns) return false
       return cell.column >= this.selectedColumns.start &&
       (cell.column + cell.colspan - 1) <= this.selectedColumns.end
     }
@@ -106,19 +112,26 @@ export default {
 </script>
 
 <style scoped>
+.active{
+  //background:rgba(0, 135, 189, .1);
+}
 .selected{
-  background:rgb(0, 135, 189);
-  border: 1px solid rgb(0, 135, 189);
+  //background:#aaa;
+  //border: 1px solid #aaa;
+  //border-bottom:none;
 }
 table {
   border-collapse: collapse;
 }
 td {
+  color:rgba(0,0,0,0.54);
   min-width: 6em;
   width: 6em;
   border:1px solid #aaa;
+  border-bottom:none;
   text-align: center;
   line-height: 1.3em;
   padding: 0;
+  cursor: cell;
 }
 </style>
