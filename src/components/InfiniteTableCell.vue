@@ -1,8 +1,7 @@
 <template>
-  <td :class="outerClass" @mousedown="$emit('mousedown')" @mouseover="$emit('mouseover')" @dblclick="$emit('dblclick')">
-      <div :class="innerClass">
-        <slot/>
-      </div>
+  <td :class="cellClass" @mousedown="$emit('mousedown', $event)" @mouseover="$emit('mouseover', $event)" @dblclick="$emit('dblclick')">
+      <slot/>
+      <div :class="overlayClass" v-if="isTop || isBottom || isLeft || isRight"></div>
   </td>
 </template>
 
@@ -49,20 +48,20 @@ export default {
       return this.isInSelectedColumnRange &&
       this.rowIndex === this.selectedRange.end.R;
     },
-    innerClass(){
+    cellClass(){
       return {
         cell: true,
+        highlight: this.isSelected,
+        active: this.isActive
+      }
+    },
+    overlayClass(){
+      return{
+        overlay: true,
         top: this.isTop,
         right: this.isRight,
         bottom: this.isBottom,
         left: this.isLeft,
-        highlight: this.isSelected && !this.isActive
-      }
-    },
-    outerClass(){
-      return {
-        outer: true,
-        selected: this.isSelected
       }
     }
   }
@@ -71,48 +70,44 @@ export default {
 
 <style>
 
-.outer{
-  padding:0;
-  overflow: hidden;
-}
-
-.outer.selected{
-  border:1px solid rgb(0, 135, 189);
-}
-
 .cell{
   width: 6em;
+  min-width: 6em;
+  max-width: 6em;
   box-sizing: border-box;
   background:none;
-  padding:1px;
-  border:0px solid rgb(0, 135, 189);
   height:30px;
-}
-
-.cell.top{
-  border-top-width: 1px;
-  padding-top: 0;
-}
-
-.cell.right{
-  border-right-width: 1px;
-  padding-right: 0;
-}
-
-.cell.bottom{
-  border-bottom-width: 1px;
-  padding-bottom: 0;
-}
-
-.cell.left{
-  border-left-width: 1px;
-  padding-left: 0;
+  overflow: visible;
+  position:relative;
 }
 
 .cell.highlight{
-  background: rgba(0, 135, 189, .13);
+  background: rgba(0, 135, 189, .1);
+}
+.cell.active{
+  background: none;
 }
 
+.overlay {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  border: 0px solid rgb(0, 135, 189);
+}
+.overlay.top {
+  border-top-width: 2px;
+}
+.overlay.left {
+  border-left-width: 2px;
+}
+.overlay.right {
+  border-right-width: 2px;
+}
+.overlay.bottom {
+  border-bottom-width: 2px;
+}
 ::selection {
   background: none;
 }

@@ -1,28 +1,17 @@
 <template>
   <div id="app">
-    This is a table!
+    This is an editable table with 1 million rows
     <infinite-table
       :headers="headers"
-      :row-count="10000"
+      :row-count="1e6"
       :column-count="7"
-      :tableData="{rows: 10000, columns: 4, get: cellValue, set: setRangeValue}"
-    />
-
-    <infinite-table
-      :row-count="10000"
-      :column-count="6"
-      v-model="sampleData"
+      :tableData="{get: getCellValue, set: setRangeValue}"
     />
   </div>
 </template>
 
 <script>
 import InfiniteTable from './components/InfiniteTable.vue'
-
-var d = {}
-for(var i = 0; i < 10000; ++i){
-  d[i] = [i,"a","b","c"]
-}
 
 export default {
   name: 'app',
@@ -31,7 +20,6 @@ export default {
   },
   data() {
     return{
-      sampleData: d,
       headers: [
         {name: "name", type:"string", children: [
             {name: "area"},
@@ -45,9 +33,9 @@ export default {
             {name: "area"},
             {name: "zip"}
           ]}
-        ]},
-        {name: "hair", type:"string"}
-      ]
+        ]}
+      ],
+      setRanges: []
     }
   },
   methods: {
@@ -55,16 +43,21 @@ export default {
       console.log('inputRange')
       console.log(payload)
     },
-    cellValue(row, column){
-      return d[row][column]
-    },
-    setRangeValue(range, value) {
-      console.log(range)
-      for(var row = range.start.R; row <= range.end.R; row++){
-        for(var column = range.start.C; column <= range.end.C; column++){
-          this.$set(d[row], column, value)
+    getCellValue(row, column){
+      let value = 'R'+row+'C'+column
+      for(var set of this.setRanges){
+        if(row >= set.range.start.R && row <= set.range.end.R &&
+          column >= set.range.start.C && column <= set.range.end.C) {
+          value = set.value
         }
       }
+      return value
+    },
+    setRangeValue(range, value) {
+      this.setRanges.push({
+        range,
+        value
+      })
     }
   }
 }

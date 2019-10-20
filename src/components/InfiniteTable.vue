@@ -1,7 +1,7 @@
 <template>
 <div class="table-container" tabindex="1" @keydown.self="OnTableKeypress">
   <InfiniteTableHeaders
-    style="margin-left:50px;"
+    style="margin-left:51px;"
     :headers="computedHeaders"
     :selectedColumns="selectedColumns"
     :allRowsSelected="allRowsSelected"
@@ -18,8 +18,8 @@
         :row-index="row"
         :key="row - startRow" >
           <th :class="{rowId: true, active: row >= selectedRows.start && row <= selectedRows.end, selected: allColumnsSelected }"
-            @mousedown="onCellMouseDown({R: row, C: -1})"
-            @mouseover="onCellMouseOver({R: row, C: -1})"
+            @mousedown="onCellMouseDown({R: row, C: -1}, $event)"
+            @mouseover="onCellMouseOver({R: row, C: -1}, $event)"
           >
             {{row}}
             </th>
@@ -30,8 +30,8 @@
             :active-cell="active"
             :row-index="row"
             :column-index="column -1"
-            @mousedown="onCellMouseDown({R: row, C: column -1})"
-            @mouseover="onCellMouseOver({R: row, C: column -1})"
+            @mousedown="onCellMouseDown({R: row, C: column -1}, $event)"
+            @mouseover="onCellMouseOver({R: row, C: column -1}, $event)"
             @dblclick="onCellDblClick({R: row, C: column -1})"
           >
             <input v-if="isEditing && active.R == row && active.C == column - 1"
@@ -41,7 +41,7 @@
               ref="theinput"
               @keydown="onInputKeypress"
             >
-            <div v-else class="the-input">{{getCellValue(row, column -1)}}</div>
+            <template v-else class="the-input">{{getCellValue(row, column -1)}}</template>
           </td>
         </tr>
       </table>
@@ -109,9 +109,8 @@ export default {
       referenceRow: {row: 0, scrollTop: 0},
       lastScrollTop: 0,
       renderedRows: ROW_COUNT+2*BUFFER_ROWS,
-      startRow: -1,
+      startRow: 0,
       topBufferHeight: 0,
-      contentHeight: ROW_COUNT*ROW_HEIGHT,
       isEditing: false,
       isDeepEditing: false,
       isSelectable: true,
@@ -164,51 +163,57 @@ export default {
       }
       return ret;
     },
-    OnTableKeypress(){
+    OnTableKeypress(event){
       const rowShift = this.isEndKeyPressed ? this.rowCount : 1
       const columnShift = (this.isEndKeyPressed || event.key == 'Home') ? this.columnCount : 1
       switch(event.key){
         case 'Escape':
           this.endEdit()
-          this.OnArrow(0, 0)
+          this.OnArrow(event, 0, 0)
           break
         case 'ArrowDown':
           event.preventDefault() // stop window scrolling
-          this.OnArrow(0, rowShift)
+          this.OnArrow(event, 0, rowShift)
           break
         case 'ArrowUp':
           event.preventDefault() // stop window scrolling
-          this.OnArrow(0, -rowShift)
+          this.OnArrow(event, 0, -rowShift)
           break
         case 'ArrowLeft':
         case 'Home':
           event.preventDefault() // stop window scrolling
-          this.OnArrow(-columnShift, 0)
+          this.OnArrow(event, -columnShift, 0)
           break
         case 'ArrowRight':
           event.preventDefault() // stop window scrolling
-          this.OnArrow(columnShift, 0)
+          this.OnArrow(event, columnShift, 0)
           break
         case 'Tab':
           event.preventDefault() // stop table losing focus
-          this.OnTab()
+          this.OnTab(event)
           break
         case 'Enter':
           event.preventDefault() // stop window scrolling
-          this.OnEnter()
+          this.OnEnter(event)
           break
         case 'PageUp':
           event.preventDefault() // stop window scrolling
-          this.OnArrow(0,-ROW_COUNT)
+          this.OnArrow(event, 0,-ROW_COUNT)
           break
         case 'PageDown':
           event.preventDefault() // stop window scrolling
-          this.OnArrow(0,ROW_COUNT)
+          this.OnArrow(event, 0,ROW_COUNT)
           break
         case 'Delete':
+          if(this.isEditing){
+            return
+          }
           this.OnDelete()
           break;
         case 'Backspace':
+          if(this.isEditing){
+            return
+          }
           this.OnDelete()
           this.startEdit()
           break
@@ -230,7 +235,7 @@ export default {
         event.preventDefault() // stop window scrolling
       }
     },
-    onInputKeypress(){
+    onInputKeypress(event){
       switch(event.key){
         case 'Escape':
           this.cancelEdit()
@@ -242,7 +247,7 @@ export default {
             return
           }
         default:
-          this.OnTableKeypress()
+          this.OnTableKeypress(event)
       }
     },
     scrollToRow(iRow){
@@ -256,7 +261,7 @@ export default {
         (iRow-this.referenceRow.row-offset)*ROW_HEIGHT
       }
     },
-    OnArrow(dColumn, dRow, ignoreShiftKey){
+    OnArrow(event, dColumn, dRow, ignoreShiftKey){
       if(event.shiftKey && !ignoreShiftKey){
         this.selection.end.C += dColumn
         this.selection.end.R += dRow
@@ -271,9 +276,9 @@ export default {
       this.clampSelection()
       this.scrollToRow(this.selection.end.R)
     },
-    OnTab(){
+    OnTab(event){
       if(this.selectedCellCount == 1){
-        this.OnArrow(event.shiftKey ? -1 : 1, 0, true)
+        this.OnArrow(event, event.shiftKey ? -1 : 1, 0, true)
         return
       }
       const last = event.shiftKey ? this.selectedRange.start : this.selectedRange.end
@@ -285,12 +290,12 @@ export default {
         first.R : this.active.R + (event.shiftKey ? -1 : 1))
       }
     },
-    OnEnter(){
+    OnEnter(event){
       if(this.isEditing){
         this.endEdit(event.ctrlKey)
       }
       if(this.selectedCellCount == 1){
-        this.OnArrow(0, event.shiftKey ? -1 : 1, true)
+        this.OnArrow(event, 0, event.shiftKey ? -1 : 1, true)
         return
       }
       const last = event.shiftKey ? this.selectedRange.start : this.selectedRange.end
@@ -316,6 +321,8 @@ export default {
       console.log(this.selection.start.R)
     },
     selectColumns(columns){
+      this.active.R = 0
+      this.active.C = columns.start
       if(!event.shiftKey){
         this.selection.start.C = columns.start
       }
@@ -323,7 +330,7 @@ export default {
       this.selection.start.R = 0
       this.selection.end.R = this.rowCount - 1
     },
-    scrollTable(){
+    scrollTable(event){
       const scrollTop = event.target.scrollTop
       if(this.rowCount > MAX_ROWS){
         const step = scrollTop - this.lastScrollTop
@@ -362,7 +369,7 @@ export default {
       }
       this.lastScrollTop = scrollTop
     },
-    onCellMouseDown(cell){
+    onCellMouseDown(cell, event){
       if(this.isEditing) {
         if(cell.C === this.active.C && cell.R === this.active.R){
           this.isDeepEditing = true
@@ -390,12 +397,11 @@ export default {
       }
       window.getSelection().removeAllRanges();
     },
-    onCellMouseOver(cell){
+    onCellMouseOver(cell, event){
       if(event.buttons == 1){
-        if(cell.C > 0){
+        if(cell.C >= 0){
           this.selection.end.C = cell.C
         }
-        
         this.selection.end.R = cell.R
       }
     },
@@ -429,6 +435,9 @@ export default {
       )
     },
     endEdit(fillSelection) {
+      if(!this.isEditing){
+        return
+      }
       if(fillSelection) {
         this.setRangeValue(this.selectedRange, this.inputValue)
       }
@@ -444,6 +453,9 @@ export default {
     }
   },
   computed: {
+    contentHeight() {
+      return Math.min(ROW_COUNT, this.rowCount)*ROW_HEIGHT
+    },
     selectedRange(){
       if(!this.isSelectable){
         return {
@@ -481,7 +493,7 @@ export default {
     },
     renderedRowArray() {
       let renderedRows = []
-      var currentRow = this.startRow+1
+      var currentRow = this.startRow
       for(var i = 0; i < this.renderedRowCount; i ++){
         renderedRows.push(currentRow++)
       }
@@ -516,11 +528,14 @@ export default {
 
 <style scoped>
 .table-container{
-  border-bottom:1px solid lime;
+  border-bottom:1px solid #aaa;
+  
   outline:none;
+  display: table;
 }
 .table-body{
   border-top: 1px solid #aaa;
+  border-right:1px solid #aaa;
   overflow-y: scroll;
   position: relative;
   cursor: cell;
@@ -554,6 +569,8 @@ th {
 
 .rowId{
   width: 48px;
+  min-width: 48px;
+  max-width: 48px;
 }
 .rowId.active {
   //background: rgba(0, 135, 189, .1);

@@ -124,9 +124,10 @@ table {
   border-collapse: collapse;
 }
 td {
+  box-sizing: border-box;
   color:rgba(0,0,0,0.54);
-  min-width: 6em;
   width: 6em;
+  min-width: 6em;
   border:1px solid #aaa;
   border-bottom:none;
   text-align: center;
