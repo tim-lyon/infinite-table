@@ -22,15 +22,15 @@ export default {
     return{
       headers: [
         {name: "name", type:"string", children: [
-            {name: "area"},
-            {name: "zip"}
+            {name: "area", type: "boolean"},
+            {name: "zip", type: "number"}
           ]},
-        {name: "age", type:"integer", unit:"years"},
+        {name: "age", type:"button", unit:"years", onclick: (row, column) => alert('clicked! row: ' + row + ' column: ' + column)},
         {name: "address", children: [
-          {name: "house", type:"string"},
-          {name: "street", type:"string"},
+          {name: "house", type:"string", disabled: true},
+          {name: "street", type:"boolean"},
           {name: "city", type:"string", children: [
-            {name: "area"},
+            {name: "area", options: ['One', 'Two', 'Three']},
             {name: "zip"}
           ]}
         ]}
@@ -49,6 +49,30 @@ export default {
         if(row >= set.range.start.R && row <= set.range.end.R &&
           column >= set.range.start.C && column <= set.range.end.C) {
           value = set.value
+        }
+      }
+      if(row == 4){
+        return {
+          value,
+          disabled: false
+        }
+      }
+      if(row == 6){
+        return {
+          value: true,
+          type: 'boolean',
+          disabled: true
+        }
+      }
+      if(row == 5 && column == 1){
+        return {
+          value: value,
+          options: [
+            {name: 'Car', value: 2},
+            'Horse',
+            'Tree',
+            'Badger'
+          ]
         }
       }
       return value

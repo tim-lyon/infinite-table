@@ -6,6 +6,7 @@
     :selectedColumns="selectedColumns"
     :allRowsSelected="allRowsSelected"
     @selectColumnRange="selectColumns"
+    @columnDetails="setColumnDetails"
   />
   <div class="table-body" ref="body" :style="{height:contentHeight+'px'}" @scroll="scrollTable">
     <div :style="{height: totalHeight+'px'}">
@@ -22,6 +23,7 @@
             @mouseover="onCellMouseOver({R: row, C: -1}, $event)"
           >
             {{row}}
+            <div v-if="row >= selectedRows.start && row <= selectedRows.end" class="row-number-overlay"/>
             </th>
           <td is="InfiniteTableCell"
             v-for="column in columnCount"
@@ -34,14 +36,41 @@
             @mouseover="onCellMouseOver({R: row, C: column -1}, $event)"
             @dblclick="onCellDblClick({R: row, C: column -1})"
           >
-            <input v-if="isEditing && active.R == row && active.C == column - 1"
-              type="text"
-              class="the-input"
-              v-model="inputValue"
-              ref="theinput"
-              @keydown="onInputKeypress"
-            >
-            <template v-else class="the-input">{{getCellValue(row, column -1)}}</template>
+            <div v-for="(value, index) of [getCellValue(row, column -1)]" :key="'v'+index"
+            :class="valueClass(value)">
+              <input v-if="value.type === 'boolean'" type="checkbox" :disabled="value.disabled" tabindex="-1" @mousedown.stop/>
+              <button v-else-if="value.type === 'button'"
+                :disabled="value.disabled"
+                tabindex="-1"
+                @mousedown.stop
+                @click="value.onclick(row, column-1)">
+                {{displayString(value)}}
+              </button>
+              <input v-else-if="isEditing && active.R == row && active.C == column - 1"
+                :type="inputType(value)"
+                class="the-input"
+                v-model="inputValue"
+                ref="theinput"
+                @keydown="onInputKeypress"
+              >
+              <select v-else-if="value.hasOptions && active.R == row && active.C == column - 1 && !value.disabled"
+                tabindex="-1"
+                @mousedown.stop
+                @change="selectValue" >
+                <option v-for="(option, index) of value.options"
+                  :key="index"
+                  :value="option.value"
+                  :selected="option.value === value.value">
+                  {{option.name}}
+                </option>
+                <option v-if="!value.options.find(option => option.value == value.value)" selected>
+                  {{value.value}}
+                </option>
+              </select>
+              
+              <template v-else>{{displayString(value)}}</template>
+            </div>
+            
           </td>
         </tr>
       </table>
@@ -106,6 +135,7 @@ export default {
   },
   data(){
     return {
+      columnDetails: [],
       referenceRow: {row: 0, scrollTop: 0},
       lastScrollTop: 0,
       renderedRows: ROW_COUNT+2*BUFFER_ROWS,
@@ -131,8 +161,59 @@ export default {
     this.isSelectable = this.selectable || this.editable
   },
   methods: {
+    setColumnDetails(details){
+      this.columnDetails = details
+    },
     getCellValue(row, column){
-      return this.hasGetFunction ? this.tableData.get(row, column) : this.tableData[row][column]
+      let value = {}
+      if(this.columnDetails[column]){
+        Object.assign(value, this.columnDetails[column])
+      }
+      let v = this.hasGetFunction ? this.tableData.get(row, column) : this.tableData[row][column]
+      if(typeof v === "object"){
+        Object.assign(value, v)
+      }else{
+        value.value = v
+      }
+      value.hasOptions = value.hasOwnProperty('options')
+      if(value.hasOptions){
+        value.options = value.options.map(option => {
+          const name = option.hasOwnProperty('name') ? option.name : option
+          const value = option.hasOwnProperty('value') ? option.value : name
+          return { name, value }
+        })
+      }
+      if(!value.hasOwnProperty('type')){
+        value.type = typeof value.value
+      }
+      if(value.type=='button' && !value.hasOwnProperty('onclick')){
+        value.onclick = new Function
+      }
+      return value
+    },
+    displayString(value){
+      let string = value.value
+      if(value.hasOptions){
+        let found = value.options.find(option => option.value == value.value)
+        if(found){
+          string = found.name
+        }
+      }
+      return string
+    },
+    valueClass(value){
+      return {
+        centre: value.type == 'boolean' || value.type == 'button',
+        disabled: value.disabled
+      }
+    },
+    inputType(value){
+      switch(value.type){
+        case 'number':
+        case 'integer':
+          return 'number'
+      }
+      return 'text'
     },
     setRangeValue(range, value){
       if(this.hasSetFunction){
@@ -144,6 +225,10 @@ export default {
           }
         }
       }
+    },
+    selectValue(event){
+      this.setRangeValue(this.cellRange(this.active.R, this.active.C), event.target.value)
+      console.log(event.target.value)
     },
     cellRange(row, column){
       return {
@@ -427,7 +512,7 @@ export default {
     },
     startEdit(resetValue) {
       if(!this.isEditable) return
-      this.inputValue = resetValue ? '' : this.getCellValue(this.active.R, this.active.C)
+      this.inputValue = resetValue ? '' : this.getCellValue(this.active.R, this.active.C).value
       this.isEditing = true
       this.isDeepEditing = !resetValue
       this.$nextTick(()=>
@@ -559,23 +644,54 @@ tr {
   border: 1px solid #aaa;
   border-top-width: 0px;
 }
-td {
-  margin: auto;
-}
+
 th {
   color:rgba(0,0,0,0.54);
   font-weight: inherit;
 }
 
+.centre{
+  text-align: center
+}
+.disabled {
+  color: rgb(150,150,150);
+}
 .rowId{
   width: 48px;
   min-width: 48px;
   max-width: 48px;
+  position: relative;
 }
 .rowId.active {
   //background: rgba(0, 135, 189, .1);
 }
 .rowId.active.selected {
-  //background: #aaa
+  background: rgba(0, 135, 189, .1);
+}
+.row-number-overlay{
+  position:absolute;
+  top: -1px;
+  bottom:-1px;
+  right:0;
+  width:1em;
+  background-image: linear-gradient(to right, rgba(0, 135, 189, 0), rgba(0, 135, 189, 0.2));
+  z-index: 1000;
+
+}
+select{
+  display: block;
+  background:none;
+  width:100%;
+  border:none;
+  font: inherit;
+  padding:0;
+  outline:none;
+}
+input[type='checkbox'] {
+  height:1em;
+  width:1em;
+}
+button{
+  width:100%;
 }
 </style>

@@ -6,11 +6,12 @@
         :key="index"
         :colspan="cell.colspan"
         :rowspan="cell.rowspan"
-        :class="{selected: isColumnSelected(cell), active: isColumnActive(cell)}"
+        :class="{selected: isColumnSelected(cell), active: isColumnActive(cell), lastRow: cell.isLastRow}"
         @mousedown.stop="onColumnMouseDown({start: cell.column, end:cell.column + cell.colspan-1})"
         @mouseover.stop="onColumnMouseOver({start: cell.column, end:cell.column + cell.colspan-1})"
       >
         {{cell.name}}
+        <div v-if="isColumnActive(cell) && cell.isLastRow" class="header-overlay"></div>
       </td>
     </tr>
   </table>
@@ -32,12 +33,19 @@ export default {
       var headers = {}
       this.getHeaderRow(this.headers, 0, 0, headers)
       const rowCount = Object.keys(headers).length
+      let columnDetails = new Map()
       for(var row = 0; row < rowCount; row++){
         for(var cell of headers[row]){
           cell.rowspan = 1 + rowCount - cell.depth - row
           cell.rowspan = cell.depth == 1 ? (rowCount - row) : 1
+          cell.isLastRow = (row + cell.rowspan) === rowCount
+          if(cell.isLastRow){
+            columnDetails.set(cell.column - 1, cell)
+          }
         }
       }
+      const sortedMap = new Map([...columnDetails.entries()].sort())
+      this.$emit('columnDetails', [...sortedMap.values()])
       return headers
     },
     rowCount(){
@@ -51,13 +59,14 @@ export default {
           result[row] = []
         }
         const colspan = this.numberOfColumns(h)
-        result[row].push({
-          name: h.name,
-          type: h.type,
+        let cell = {
           column: column,
           colspan: colspan,
           depth: this.depthOf(h)
-        })
+        }
+        Object.assign(cell, h)
+        result[row].push(cell)
+        
         if(h.hasOwnProperty('children')){
           this.getHeaderRow(h.children, row+1, column, result)
         }
@@ -112,13 +121,21 @@ export default {
 </script>
 
 <style scoped>
-.active{
-  //background:rgba(0, 135, 189, .1);
+.header-overlay{
+  position:absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  height:1em;
+  background-image: linear-gradient(rgba(0, 135, 189, 0) , rgba(68, 175, 218, .2));
+  z-index: 1000;
 }
+.lastRow{
+  position: relative;
+}
+
 .selected{
-  //background:#aaa;
-  //border: 1px solid #aaa;
-  //border-bottom:none;
+  background:rgba(0, 135, 189, .1);
 }
 table {
   border-collapse: collapse;
@@ -129,7 +146,7 @@ td {
   width: 6em;
   min-width: 6em;
   border:1px solid #aaa;
-  border-bottom:none;
+  border-bottom: none;
   text-align: center;
   line-height: 1.3em;
   padding: 0;

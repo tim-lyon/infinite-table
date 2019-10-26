@@ -51,9 +51,9 @@ Where `myHeaders` is an array of header objects following the schema below.<br> 
 |Property|Type|Default|
 |---|---|---|---|
 |`name`|String|Alphabetical (A, B, C etc)
-|`type`|String|`"text"` (see [Supported types](#SupportedTypes))
+|`type`|String|`"string"` (see [Supported types](#SupportedTypes))
 |`width`|Number|`6` (units are em)
-|`required`|Bollean|`false`
+|`required`|Boolean|`false`
 |`disabled`|Boolean|`false`
 |`unit`|String|none
 |`options`|Array|none (see [options](#Options))
@@ -62,10 +62,11 @@ Where `myHeaders` is an array of header objects following the schema below.<br> 
 
 ## Supported types<a name="SupportedTypes"></a>
 The following field value types are supported
-* `"text"`
+* `"string"`
+* `"number"`
 * `"integer"`
-* `"decimal"`
-* `"bool"` (renders as checkbox)
+* `"boolean"` (renders as checkbox)
+* `"button"` (renders as button)
 
 ## Options<a name="options"></a>
 If a field has an associated `options` property (either directly, or inherited from the column headers), it will be rendered with a `<select>` html component. Options can be passed as an array of strings (representing both the option name and value) or as an array of objects with `name` and `value` properties.

@@ -42,7 +42,7 @@ export default {
     },
     isTop(){
       return this.isInSelectedColumnRange &&
-      this.rowIndex === this.selectedRange.start.R;
+      this.rowIndex === this.selectedRange.start.R
     },
     isBottom(){
       return this.isInSelectedColumnRange &&
@@ -95,6 +95,7 @@ export default {
   right: -1px;
   bottom: -1px;
   border: 0px solid rgb(0, 135, 189);
+  pointer-events: none;
 }
 .overlay.top {
   border-top-width: 2px;
