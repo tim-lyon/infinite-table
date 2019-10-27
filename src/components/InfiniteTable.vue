@@ -1,5 +1,5 @@
 <template>
-<div class="table-container" tabindex="1" @keydown.self="OnTableKeypress">
+<div class="table-container" tabindex="1" @keydown.self="OnTableKeypress" @copy.prevent>
   <InfiniteTableHeaders
     style="margin-left:51px;"
     :headers="computedHeaders"
@@ -12,7 +12,7 @@
     <div :style="{height: totalHeight+'px'}">
       <table :style="{position:'relative', top:topBufferHeight+'px', borderCollapse: 'collapse'}">
         <colgroup>
-          <col v-for="i of columnCount" :key="i"/>
+          <col v-for="i of columnCount+1" :key="i"/>
         </colgroup>
         <tr
         v-for="row in renderedRowArray"
@@ -38,12 +38,19 @@
           >
             <div v-for="(value, index) of [getCellValue(row, column -1)]" :key="'v'+index"
             :class="valueClass(value)">
-              <input v-if="value.type === 'boolean'" type="checkbox" :disabled="value.disabled" tabindex="-1" @mousedown.stop/>
+              <input v-if="value.type === 'boolean'"
+                type="checkbox"
+                :disabled="value.disabled"
+                tabindex="-1"
+                @mousedown.stop
+                :checked="value.value"
+                @click="setCheckbox($event, row, column -1)"
+                />
               <button v-else-if="value.type === 'button'"
                 :disabled="value.disabled"
                 tabindex="-1"
                 @mousedown.stop
-                @click="value.onclick(row, column-1)">
+                @click="$emit('buttonClick', {row, column: column-1})">
                 {{displayString(value)}}
               </button>
               <input v-else-if="isEditing && active.R == row && active.C == column - 1"
@@ -76,12 +83,18 @@
       </table>
     </div>
   </div>
+  <transition name="fade">
+    <div class="table-busy" v-if="isBusy">
+      <infinite-table-loader :message="isBusy"/>
+    </div>
+  </transition>
 </div>
 </template>
 
 <script>
 import InfiniteTableHeaders from './InfiniteTableHeaders.vue'
 import InfiniteTableCell from './InfiniteTableCell.vue'
+import InfiniteTableLoader from './InfiniteTableLoader.vue'
 
 const ROW_HEIGHT = 30
 const BUFFER_ROWS = 5
@@ -99,11 +112,8 @@ export default {
   name: 'InfiniteTable',
   components: {
     InfiniteTableHeaders,
-    InfiniteTableCell
-  },
-  model: {
-    prop: 'tableData',
-    event: 'update'
+    InfiniteTableCell,
+    InfiniteTableLoader
   },
   props: {
     columnCount: {
@@ -128,8 +138,8 @@ export default {
       required: false,
       default: true
     },
-    tableData: {
-      type: Object,
+    get: {
+      type: Function,
       required: true
     }
   },
@@ -151,12 +161,11 @@ export default {
       selection: {
         start: new CellReference(),
         end: new CellReference()
-      }
+      },
+      isBusy: ''
     }
   },
   created(){
-    this.hasGetFunction = this.tableData.hasOwnProperty('get')
-    this.hasSetFunction = this.tableData.hasOwnProperty('set')
     this.isEditable = this.editable
     this.isSelectable = this.selectable || this.editable
   },
@@ -169,7 +178,7 @@ export default {
       if(this.columnDetails[column]){
         Object.assign(value, this.columnDetails[column])
       }
-      let v = this.hasGetFunction ? this.tableData.get(row, column) : this.tableData[row][column]
+      let v = this.get(row, column)
       if(typeof v === "object"){
         Object.assign(value, v)
       }else{
@@ -216,19 +225,13 @@ export default {
       return 'text'
     },
     setRangeValue(range, value){
-      if(this.hasSetFunction){
-        this.tableData.set(range, value)
-      }else{
-        for(var row = range.start.R; row <= range.end.R; row++){
-          for(var column = range.start.C; column <= range.end.C; column++){
-            this.$set(this.tableData[row], column, value)
-          }
-        }
-      }
+      this.$emit('set', {range, value})
     },
     selectValue(event){
       this.setRangeValue(this.cellRange(this.active.R, this.active.C), event.target.value)
-      console.log(event.target.value)
+    },
+    setCheckbox(event, row, column){
+      this.setRangeValue(event.ctrlKey ? this.selectedRange : this.cellRange(row, column), event.target.checked)
     },
     cellRange(row, column){
       return {
@@ -251,6 +254,31 @@ export default {
     OnTableKeypress(event){
       const rowShift = this.isEndKeyPressed ? this.rowCount : 1
       const columnShift = (this.isEndKeyPressed || event.key == 'Home') ? this.columnCount : 1
+
+      // keyboard shortcuts
+      if(event.ctrlKey){
+        switch(event.key.toLowerCase()){
+          case 'a':
+            this.selectAll()
+            return
+          case 'x':
+            this.emitEvent('cut', this.selectedRange, 'Cutting...')
+            return
+          case 'c':
+            this.emitEvent('copy', this.selectedRange, 'Copying...')
+            return
+          case 'v':
+            this.emitEvent('paste', this.selectedRange, 'Pasting...')
+            return
+          case 'y':
+            this.emitEvent('redo', this.selectedRange, 'Redoing...')
+            return
+          case 'z':
+            this.emitEvent('undo', this.selectedRange, 'Undoing...')
+            return
+        }
+      }
+
       switch(event.key){
         case 'Escape':
           this.endEdit()
@@ -305,11 +333,6 @@ export default {
         case 'F2':
           this.startEdit()
           break
-        case 'a':
-          if(event.ctrlKey){
-            this.selectAll()
-            break
-          }
         default:
           if(!this.isEditing && event.key.length == 1) {
             this.startEdit(true)
@@ -319,6 +342,13 @@ export default {
       if(this.isEndKeyPressed){
         event.preventDefault() // stop window scrolling
       }
+    },
+    emitEvent(name, payload, waitMessage){
+      this.isBusy = waitMessage
+      setTimeout(() => {
+        this.$emit(name, payload)
+        this.isBusy = false
+      }, 50);
     },
     onInputKeypress(event){
       switch(event.key){
@@ -614,9 +644,19 @@ export default {
 <style scoped>
 .table-container{
   border-bottom:1px solid #aaa;
-  
   outline:none;
   display: table;
+  position: relative;
+}
+.table-busy{
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:0;
+  right:0;
+  background:rgba(0,0,0,0.54);
+  display: flex;
+  transition: all 1s;
 }
 .table-body{
   border-top: 1px solid #aaa;
@@ -636,13 +676,15 @@ export default {
   line-height: inherit;
 }
 col {
-  border: 1px solid #aaa;
-  border-top: 1px solid white;;
+  border-left: 1px solid #aaa;
 }
 tr {
   background: none;
   border: 1px solid #aaa;
   border-top-width: 0px;
+}
+tr:last-child{
+  border-bottom-width: 0px;
 }
 
 th {
@@ -676,7 +718,6 @@ th {
   width:1em;
   background-image: linear-gradient(to right, rgba(0, 135, 189, 0), rgba(0, 135, 189, 0.2));
   z-index: 1000;
-
 }
 select{
   display: block;
@@ -690,8 +731,17 @@ select{
 input[type='checkbox'] {
   height:1em;
   width:1em;
+  outline: none;
 }
 button{
   width:100%;
+  outline: none;
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity .5s;
+  transition-delay: 0.2s;
+}
+.fade-enter, .fade-leave-to /* .fade-leave-active below version 2.1.8 */ {
+  opacity: 0;
 }
 </style>
