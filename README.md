@@ -1,5 +1,5 @@
 # infinite-table
-A high performance, virtual scrolling, lazy loading, editable data table of unlimited length.<br>Currently implemented as a Vue component.
+A high performance, virtual scrolling, lazy loading, editable data table of unlimited length. Currently implemented as a Vue component.
 
 
 >PLEASE NOTE<br>
@@ -20,13 +20,15 @@ import InfiniteTable from '@infinite-table/vue'
 ```
 For basic usage you can bind a 2D array of [field values](#fieldValues) to the `infinite-table` component
 ```html
-<infinite-table v-model="myData"/>
+<InfiniteTable v-model="myData"/>
 ```
 Alternatively, we can provide a function to get the field values and subscribe to the table's events for updates. When the size of the table gets very large, this approach can help maintain high performing table by only keeping the visible data in memory.
 ```html
-<infinite-table :get="myDataGetter"/>
+<InfiniteTable :get="myDataGetter"/>
 ```
 In this example `myDataGetter` would need to be a function that is called with two arguments - the row and column index of the cell.
+
+The maximum height of the table can be controlled using the `max-height` css atribute of the component. The default is `500px`.
 
 ## Field values<a name="fieldValues"></a>
 Each cell in an `infinite-table` is populated using a 'field value' which can be provided either as the value primitive or as an object with required `value` property and optional overrides of the column's `type`, `options`, `required` and/or `disabled` parameters.

@@ -1,115 +1,136 @@
 <template>
-  <td :class="cellClass" @mousedown="$emit('mousedown', $event)" @mouseover="$emit('mouseover', $event)" @dblclick="$emit('dblclick')">
-      <slot/>
-      <div :class="overlayClass" v-if="isTop || isBottom || isLeft || isRight"></div>
+  <td
+    :class="cellClass"
+    @mousedown="$emit('mousedown', $event)"
+    @mouseover="$emit('mouseover', $event)"
+    @dblclick="$emit('dblclick')"
+  >
+    <slot />
+    <div :class="overlayClass" v-if="showOverlay"></div>
   </td>
 </template>
 
 <script>
-
 export default {
-  name: 'InfiniteTableCell',
+  name: "InfiniteTableCell",
   props: [
-    'selectedRange',
-    'activeCell',
-    'rowIndex',
-    'columnIndex'
+    "isTableActive",
+    "selectedRange",
+    "activeCell",
+    "rowIndex",
+    "columnIndex"
   ],
   computed: {
-    isActive(){
-      return this.rowIndex == this.activeCell.R &&
-      this.columnIndex == this.activeCell.C
+    isActive() {
+      return (
+        this.rowIndex == this.activeCell.R &&
+        this.columnIndex == this.activeCell.C
+      );
     },
-    isInSelectedRowRange(){
-      return this.rowIndex >= this.selectedRange.start.R &&
-      this.rowIndex <= this.selectedRange.end.R
+    showOverlay() {
+      return (
+        this.isTableActive &&
+        (this.isTop || this.isBottom || this.isLeft || this.isRight)
+      );
     },
-    isInSelectedColumnRange(){
-      return this.columnIndex >= this.selectedRange.start.C &&
-      this.columnIndex <= this.selectedRange.end.C
+    isInSelectedRowRange() {
+      return (
+        this.rowIndex >= this.selectedRange.start.R &&
+        this.rowIndex <= this.selectedRange.end.R
+      );
     },
-    isSelected(){
-      return this.isInSelectedRowRange &&
-      this.isInSelectedColumnRange
+    isInSelectedColumnRange() {
+      return (
+        this.columnIndex >= this.selectedRange.start.C &&
+        this.columnIndex <= this.selectedRange.end.C
+      );
     },
-    isLeft(){
-      return this.isInSelectedRowRange &&
-      this.columnIndex === this.selectedRange.start.C;
+    isSelected() {
+      return this.isInSelectedRowRange && this.isInSelectedColumnRange;
     },
-    isRight(){
-      return this.isInSelectedRowRange &&
-      this.columnIndex === this.selectedRange.end.C;
+    isLeft() {
+      return (
+        this.isInSelectedRowRange &&
+        this.columnIndex === this.selectedRange.start.C
+      );
     },
-    isTop(){
-      return this.isInSelectedColumnRange &&
-      this.rowIndex === this.selectedRange.start.R
+    isRight() {
+      return (
+        this.isInSelectedRowRange &&
+        this.columnIndex === this.selectedRange.end.C
+      );
     },
-    isBottom(){
-      return this.isInSelectedColumnRange &&
-      this.rowIndex === this.selectedRange.end.R;
+    isTop() {
+      return (
+        this.isInSelectedColumnRange &&
+        this.rowIndex === this.selectedRange.start.R
+      );
     },
-    cellClass(){
+    isBottom() {
+      return (
+        this.isInSelectedColumnRange &&
+        this.rowIndex === this.selectedRange.end.R
+      );
+    },
+    cellClass() {
       return {
         cell: true,
-        highlight: this.isSelected,
-        active: this.isActive
-      }
+        highlight: this.isTableActive && this.isSelected,
+        active: this.isTableActive && this.isActive
+      };
     },
-    overlayClass(){
-      return{
+    overlayClass() {
+      return {
         overlay: true,
         top: this.isTop,
         right: this.isRight,
         bottom: this.isBottom,
-        left: this.isLeft,
-      }
+        left: this.isLeft
+      };
     }
   }
-}
+};
 </script>
 
 <style>
-
-.cell{
+.cell {
   width: 6em;
   min-width: 6em;
   max-width: 6em;
   box-sizing: border-box;
-  background:none;
-  height:30px;
+  background: none;
+  height: 30px;
   overflow: visible;
-  position:relative;
+  position: relative;
 }
 
-.cell.highlight{
-  background: rgba(0, 135, 189, .1);
+.cell.highlight {
+  background: rgba(0, 135, 189, 0.1);
+  border: 1px solid rgb(0, 135, 189);
 }
-.cell.active{
+.cell.active {
   background: none;
 }
 
 .overlay {
   position: absolute;
-  top: -1px;
-  left: -1px;
-  right: -1px;
-  bottom: -1px;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
   border: 0px solid rgb(0, 135, 189);
   pointer-events: none;
 }
 .overlay.top {
-  border-top-width: 2px;
+  border-top-width: 1.5px;
 }
 .overlay.left {
-  border-left-width: 2px;
+  border-left-width: 1.5px;
 }
 .overlay.right {
-  border-right-width: 2px;
+  border-right-width: 1.5px;
 }
 .overlay.bottom {
-  border-bottom-width: 2px;
-}
-::selection {
-  background: none;
+  border-bottom-width: 1.5px;
 }
 </style>

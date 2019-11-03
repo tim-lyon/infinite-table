@@ -9,28 +9,28 @@
 
 <script>
 export default {
-  name: 'InfiniteTableLoader',
-  props: ['message']
-}
+  name: "InfiniteTableLoader",
+  props: ["message"]
+};
 </script>
 
 <style scoped>
 .loader-container {
-  color:white;
+  color: white;
   margin: auto;
   position: relative;
   display: flex;
 }
-.loader-label{
-  position:absolute;
-  left:1em;
-  right:1em;
-  top:0;
-  bottom:0;
-  display:flex;
+.loader-label {
+  position: absolute;
+  left: 1em;
+  right: 1em;
+  top: 0;
+  bottom: 0;
+  display: flex;
 }
-.loader-label>div{
-  margin:auto;
+.loader-label > div {
+  margin: auto;
   text-align: center;
 }
 .loader,
@@ -74,5 +74,4 @@ export default {
     transform: rotate(360deg);
   }
 }
-
 </style>
