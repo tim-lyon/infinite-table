@@ -11,8 +11,7 @@
         @mousedown.stop="onColumnMouseDown({start: cell.column, end:cell.column + cell.colspan-1})"
         @mouseover.stop="onColumnMouseOver({start: cell.column, end:cell.column + cell.colspan-1})"
       >
-        <div style="overflow:hidden;">{{cell.name}}</div>
-
+        {{cell.name}}
         <div v-if="isColumnActive(cell) && cell.isLastRow" class="header-overlay" />
         <div
           class="column-width-handle"
@@ -195,8 +194,10 @@ export default {
   background: rgba(0, 135, 189, 0.1);
 }
 table {
+  border-spacing: 0;
   border-collapse: collapse;
 }
+
 td {
   box-sizing: border-box;
   color: rgba(0, 0, 0, 0.54);

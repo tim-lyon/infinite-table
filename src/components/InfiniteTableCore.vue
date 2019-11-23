@@ -10,9 +10,9 @@
       @focus="checkIsTableActive"
       @blur="checkIsTableActive"
     >
-      <div v-if="computedHeaders !== false">
+      <div v-if="computedHeaders !== false" style="display:flex;border-bottom:1px solid #e0e0e0;">
+        <div :style="'width:'+(1+this.rowNumberWidth)+'px;'" />
         <InfiniteTableHeaders
-          :style="'margin-left:'+this.rowNumberWidth+'px;'"
           :headers="computedHeaders"
           :isTableActive="isTableActive"
           :selectedColumns="selectedColumns"
@@ -27,16 +27,14 @@
       <div class="table-body-container">
         <div class="table-body" ref="body" @scroll="scrollTable">
           <div :style="tableBodyInnerStyle">
-            <table :style="tableBodyVisibleStyle">
-              <colgroup>
-                <col
-                  v-for="i of columnCount+1"
-                  :key="i"
-                  :style="{width: columnWidth(i-2),maxWidth: columnWidth(i-2), minWidth: columnWidth(i-2), overflow:'hidden'}"
-                />
-              </colgroup>
-              <tr v-for="row in renderedRowArray" :row-index="row" :key="row - startRow">
-                <th
+            <div :style="tableBodyVisibleStyle">
+              <div
+                v-for="row in renderedRowArray"
+                :row-index="row"
+                :key="row - startRow"
+                class="table-row"
+              >
+                <div
                   :class="tableRowHeaderStyle(row)"
                   v-if="headers !== false"
                   @mousedown="onCellMouseDown({R: row, C: -1}, $event)"
@@ -47,9 +45,8 @@
                     v-if="isTableActive && row >= selectedRows.start && row <= selectedRows.end"
                     class="row-number-overlay"
                   />
-                </th>
-                <td
-                  is="InfiniteTableCell"
+                </div>
+                <InfiniteTableCell
                   v-for="column in columnCount"
                   :key="column"
                   :is-table-active="isTableActive"
@@ -57,6 +54,7 @@
                   :active-cell="active"
                   :row-index="row"
                   :column-index="column -1"
+                  :style="cellStyle(column-1)"
                   @mousedown="onCellMouseDown({R: row, C: column -1}, $event)"
                   @mouseover="onCellMouseOver({R: row, C: column -1}, $event)"
                   @dblclick="onCellDblClick"
@@ -113,9 +111,10 @@
                     </select>
                     <template v-else>{{displayString(value)}}</template>
                   </div>
-                </td>
-              </tr>
-            </table>
+                </InfiniteTableCell>
+              </div>
+              <div :style="overlayStyle" v-show="isTableActive" />
+            </div>
           </div>
         </div>
       </div>
@@ -143,8 +142,8 @@ const clamp = (value, min, max) =>
   value < min ? min : value > max ? max : value;
 
 function CellReference() {
-  this.R = -1;
-  this.C = -1;
+  this.R = 0;
+  this.C = 0;
 }
 
 export default {
@@ -227,11 +226,9 @@ export default {
       this.columnDetails = details;
     },
     columnWidth(column) {
-      return (
-        (this.columnDetails[column]
-          ? this.columnDetails[column].width
-          : this.rowNumberWidth + 1) + "px"
-      );
+      return this.columnDetails[column]
+        ? this.columnDetails[column].width
+        : this.rowNumberWidth + 1;
     },
     getCellValue(row, column) {
       let value = {};
@@ -720,11 +717,60 @@ export default {
         active: row >= this.selectedRows.start && row <= this.selectedRows.end,
         selected: this.isTableActive && this.allColumnsSelected
       };
+    },
+    rowStartY(row) {
+      return ROW_HEIGHT * row - 1;
+    },
+    rowEndY(row) {
+      return ROW_HEIGHT * (row + 1);
+    },
+    columnStartX(column) {
+      let start = this.rowNumberWidth;
+      for (var columnIndex = 0; columnIndex < column; ++columnIndex) {
+        start += this.columnWidth(columnIndex);
+      }
+      return start;
+    },
+    columnEndX(column) {
+      return 1 + this.columnStartX(column) + this.columnWidth(column);
+    },
+    cellStyle(column) {
+      const width = this.columnWidth(column) + "px";
+      return {
+        width,
+        maxWidth: width,
+        minWidth: width,
+        overflow: "hidden"
+      };
     }
   },
   computed: {
     contentHeight() {
       return Math.min(ROW_COUNT, this.rowCount) * ROW_HEIGHT + 2;
+    },
+    overlayStyle() {
+      const left = this.columnStartX(this.selectedRange.start.C);
+      const right = this.columnEndX(this.selectedRange.end.C);
+      const width = right - left;
+
+      const top = this.rowStartY(
+        Math.max(0, this.selectedRange.start.R - this.startRow)
+      );
+      const bottom = this.rowEndY(
+        Math.min(this.renderedRows, this.selectedRange.end.R - this.startRow)
+      );
+      const height = Math.max(0, bottom - top);
+
+      return {
+        position: "absolute",
+        top: top + "px",
+        left: left + "px",
+        height: height + "px",
+        width: width + "px",
+        border: "1.5px solid  rgb(0, 135, 189)",
+        boxSizing: "border-box",
+        pointerEvents: "none"
+      };
     },
     selectedRange() {
       if (!this.isSelectable) {
@@ -785,7 +831,7 @@ export default {
       );
     },
     totalHeight() {
-      return Math.min(MAX_ROWS, this.rowCount) * ROW_HEIGHT + 3;
+      return Math.min(MAX_ROWS, this.rowCount) * ROW_HEIGHT;
     },
     allRowsSelected() {
       return (
@@ -813,15 +859,14 @@ export default {
     tableBodyInnerStyle() {
       return {
         height: this.totalHeight + "px",
-        width: this.totalWidth + "px"
+        //width: this.totalWidth + "px",
+        position: "relative"
       };
     },
     tableBodyVisibleStyle() {
       return {
         position: "relative",
         top: this.topBufferHeight + "px",
-        borderCollapse: "collapse",
-        //background: "blue"
         width: "100%",
         tableLayout: "fixed"
       };
@@ -866,6 +911,17 @@ export default {
   overflow-y: auto;
   cursor: cell;
   flex: 1;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+}
+.table-row {
+  box-sizing: border-box;
+  display: flex;
+  height: 30px;
+  line-height: 30px;
+}
+.table-row:nth-last-child(2) > div {
+  border-bottom: none;
 }
 
 .the-input {
@@ -877,18 +933,6 @@ export default {
   line-height: inherit;
   width: 100%;
 }
-col {
-  border-left: 1px solid #e0e0e0;
-}
-tr {
-  border: 1px solid #e0e0e0;
-  //border-top-width: 0px;
-}
-
-th {
-  color: rgba(0, 0, 0, 0.54);
-  font-weight: inherit;
-}
 
 .centre {
   text-align: center;
@@ -898,6 +942,8 @@ th {
 }
 .rowId {
   position: relative;
+  width: 50px;
+  border-bottom: 1px solid #e0e0e0;
 }
 .rowId.active.selected {
   background: rgba(0, 135, 189, 0.1);

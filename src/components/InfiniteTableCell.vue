@@ -1,13 +1,12 @@
 <template>
-  <td
+  <div
     :class="cellClass"
     @mousedown="$emit('mousedown', $event)"
     @mouseover="$emit('mouseover', $event)"
     @dblclick="$emit('dblclick')"
   >
     <slot />
-    <div :class="overlayClass" v-if="showOverlay"></div>
-  </td>
+  </div>
 </template>
 
 <script>
@@ -25,12 +24,6 @@ export default {
       return (
         this.rowIndex == this.activeCell.R &&
         this.columnIndex == this.activeCell.C
-      );
-    },
-    showOverlay() {
-      return (
-        this.isTableActive &&
-        (this.isTop || this.isBottom || this.isLeft || this.isRight)
       );
     },
     isInSelectedRowRange() {
@@ -78,15 +71,6 @@ export default {
         highlight: this.isTableActive && this.isSelected,
         active: this.isTableActive && this.isActive
       };
-    },
-    overlayClass() {
-      return {
-        overlay: true,
-        top: this.isTop,
-        right: this.isRight,
-        bottom: this.isBottom,
-        left: this.isLeft
-      };
     }
   }
 };
@@ -96,40 +80,18 @@ export default {
 .cell {
   box-sizing: border-box;
   background: none;
-  height: 30px;
   overflow: hidden;
   white-space: nowrap;
   position: relative;
   color: rgba(0, 0, 0, 0.87);
+  border-left: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .cell.highlight {
   background: rgba(0, 135, 189, 0.1);
-  border: 1px solid rgb(0, 135, 189);
 }
 .cell.active {
   background: none;
-}
-
-.overlay {
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  right: 0px;
-  bottom: 0px;
-  border: 0px solid rgb(0, 135, 189);
-  pointer-events: none;
-}
-.overlay.top {
-  border-top-width: 1px;
-}
-.overlay.left {
-  border-left-width: 1px;
-}
-.overlay.right {
-  border-right-width: 1px;
-}
-.overlay.bottom {
-  border-bottom-width: 1px;
 }
 </style>
