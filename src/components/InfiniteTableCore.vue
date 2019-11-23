@@ -12,13 +12,16 @@
     >
       <div v-if="computedHeaders !== false">
         <InfiniteTableHeaders
-          style="margin-left:51px;"
+          :style="'margin-left:'+this.rowNumberWidth+'px;'"
           :headers="computedHeaders"
           :isTableActive="isTableActive"
           :selectedColumns="selectedColumns"
           :allRowsSelected="allRowsSelected"
+          :columnCount="columnCount"
           @selectColumnRange="selectColumns"
           @columnDetails="setColumnDetails"
+          @startAdjustingColumnWidths="isAdjustingColumnWidths = true"
+          @endAdjustingColumnWidths="isAdjustingColumnWidths = false"
         />
       </div>
       <div class="table-body-container">
@@ -26,7 +29,11 @@
           <div :style="tableBodyInnerStyle">
             <table :style="tableBodyVisibleStyle">
               <colgroup>
-                <col v-for="i of columnCount+1" :key="i" />
+                <col
+                  v-for="i of columnCount+1"
+                  :key="i"
+                  :style="{width: columnWidth(i-2),maxWidth: columnWidth(i-2), minWidth: columnWidth(i-2), overflow:'hidden'}"
+                />
               </colgroup>
               <tr v-for="row in renderedRowArray" :row-index="row" :key="row - startRow">
                 <th
@@ -156,6 +163,10 @@ export default {
       type: Number,
       required: true
     },
+    rowNumberWidth: {
+      type: Number,
+      default: 50
+    },
     headers: {
       required: false,
       default: true
@@ -178,6 +189,7 @@ export default {
   data() {
     return {
       columnDetails: [],
+      isAdjustingColumnWidths: false,
       referenceRow: { row: 0, scrollTop: 0 },
       lastScrollTop: 0,
       renderedRows: ROW_COUNT + 2 * BUFFER_ROWS,
@@ -213,6 +225,13 @@ export default {
     },
     setColumnDetails(details) {
       this.columnDetails = details;
+    },
+    columnWidth(column) {
+      return (
+        (this.columnDetails[column]
+          ? this.columnDetails[column].width
+          : this.rowNumberWidth + 1) + "px"
+      );
     },
     getCellValue(row, column) {
       let value = {};
@@ -403,7 +422,7 @@ export default {
       setTimeout(() => {
         this.$emit(name, payload);
         this.isBusy = false;
-      }, 50);
+      }, this.rowNumberWidth);
     },
     onInputKeypress(event) {
       if (event.key === "Escape") {
@@ -549,6 +568,9 @@ export default {
       );
     },
     selectColumns(columns) {
+      if (this.isAdjustingColumnWidths) {
+        return;
+      }
       this.active.R = 0;
       this.active.C = columns.start;
       if (!event.shiftKey) {
@@ -632,7 +654,7 @@ export default {
       }
     },
     onCellMouseOver(cell, event) {
-      if (event.buttons == 1) {
+      if (!this.isAdjustingColumnWidths && event.buttons == 1) {
         if (cell.C >= 0) {
           this.selection.end.C = cell.C;
         }
@@ -753,6 +775,15 @@ export default {
       }
       return renderedRows;
     },
+    totalWidth() {
+      return (
+        1 +
+        this.rowNumberWidth +
+        this.columnDetails.reduce((a, b) => {
+          return a + (b.hasOwnProperty("width") ? b.width : 0);
+        }, 0)
+      );
+    },
     totalHeight() {
       return Math.min(MAX_ROWS, this.rowCount) * ROW_HEIGHT + 3;
     },
@@ -781,15 +812,18 @@ export default {
     },
     tableBodyInnerStyle() {
       return {
-        height: this.totalHeight + "px"
+        height: this.totalHeight + "px",
+        width: this.totalWidth + "px"
       };
     },
     tableBodyVisibleStyle() {
       return {
         position: "relative",
         top: this.topBufferHeight + "px",
-        borderCollapse: "collapse"
+        borderCollapse: "collapse",
         //background: "blue"
+        width: "100%",
+        tableLayout: "fixed"
       };
     }
   }
@@ -844,10 +878,10 @@ export default {
   width: 100%;
 }
 col {
-  border-left: 1px solid #aaa;
+  border-left: 1px solid #e0e0e0;
 }
 tr {
-  border: 1px solid #aaa;
+  border: 1px solid #e0e0e0;
   //border-top-width: 0px;
 }
 
@@ -863,9 +897,6 @@ th {
   color: rgb(150, 150, 150);
 }
 .rowId {
-  width: 48px;
-  min-width: 48px;
-  max-width: 48px;
   position: relative;
 }
 .rowId.active.selected {
@@ -886,6 +917,7 @@ th {
 }
 input {
   outline: none;
+  color: inherit;
 }
 select {
   display: block;
@@ -895,6 +927,10 @@ select {
   font: inherit;
   padding: 0;
   outline: none;
+  color: inherit;
+}
+button {
+  color: inherit;
 }
 .fade-enter-active,
 .fade-leave-active {

@@ -18,7 +18,7 @@
     </p>
     <InfiniteTable
       :row-count="1e6"
-      :column-count="4"
+      :column-count="5"
       :headers="headers"
       :editable="editable"
       :selectable="selectable"

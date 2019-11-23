@@ -94,14 +94,13 @@ export default {
 
 <style>
 .cell {
-  width: 6em;
-  min-width: 6em;
-  max-width: 6em;
   box-sizing: border-box;
   background: none;
   height: 30px;
-  overflow: visible;
+  overflow: hidden;
+  white-space: nowrap;
   position: relative;
+  color: rgba(0, 0, 0, 0.87);
 }
 
 .cell.highlight {
@@ -122,15 +121,15 @@ export default {
   pointer-events: none;
 }
 .overlay.top {
-  border-top-width: 1.5px;
+  border-top-width: 1px;
 }
 .overlay.left {
-  border-left-width: 1.5px;
+  border-left-width: 1px;
 }
 .overlay.right {
-  border-right-width: 1.5px;
+  border-right-width: 1px;
 }
 .overlay.bottom {
-  border-bottom-width: 1.5px;
+  border-bottom-width: 1px;
 }
 </style>

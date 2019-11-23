@@ -31,12 +31,12 @@ In this example `myDataGetter` would need to be a function that is called with t
 The maximum height of the table can be controlled using the `max-height` css atribute of the component. The default is `500px`.
 
 ## Field values<a name="fieldValues"></a>
-Each cell in an `infinite-table` is populated using a 'field value' which can be provided either as the value primitive or as an object with required `value` property and optional overrides of the column's `type`, `options`, `required` and/or `disabled` parameters.
+Each cell in an `infinite-table` is populated using a value which can be provided either as a primitive value or as an object with required `value` property and optional overrides of the column's `type`, `options`, `required` and/or `disabled` parameters.
 
 ## Headers
-The `headers` prop allows column headers (and associated field's attributes) to be added and customised.
+The `headers` prop allows column headers (and their associated cell's attributes) to be added and customised.
 ```html
-<!-- default headers (A, B, C...) -->
+<!-- default column headers (A, B, C...) -->
 <infinite-table />
 
 <!-- custom headers -->
@@ -45,12 +45,12 @@ The `headers` prop allows column headers (and associated field's attributes) to 
 <!-- no headers -->
 <infinite-table :headers="false" />
 ```
-Where `myHeaders` is an array of header objects following the schema below.<br> All properties are optional.
+Where `myHeaders` is an array of header objects with properties as below.
 |Property|Type|Default|
 |---|---|---|---|
 |`name`|String|Alphabetical (A, B, C etc)
 |`type`|String|`"string"` (see [Supported types](#SupportedTypes))
-|`width`|Number|`6` (units are em)
+|`width`|Number|`6` (em)
 |`disabled`|Boolean|`false`
 |`unit`|String|none
 |`options`|Array|none (see [options](#Options))
