@@ -1,12 +1,6 @@
 # infinite-table
 A high performance, virtual scrolling, lazy loading, editable data table of unlimited length. Currently implemented as a Vue component.
 
-
->PLEASE NOTE<br>
-This is a work in progress project! Most of the features described below are not yet implemented (and will likely change)!<br>
-The npm package has not yet been published<br>
-Please check back soon for updates!
-
 ## Installation
 
 ```
@@ -97,7 +91,3 @@ SetValues = {
 |`undo`|none
 |`redo`|none
 |`button-click`|CellReference (cell where the button was clicked)
-|`insert-row`|Insert row range `{row:#, count:#}`
-|`delete-row`|Delete row range (as above)
-|`insert-column`|Insert column range `{column:#, count:#}`
-|`delete-column`|Delete column range (as above)

@@ -56,20 +56,24 @@ export default {
       var headers = {};
       this.getHeaderRow(this.headers, 0, 0, headers);
       const rowCount = Object.keys(headers).length;
-      let columnDetails = new Map();
+      let columnDetails = {};
       for (var row = 0; row < rowCount; row++) {
-        headers[row].forEach(cell => {
+        for(var iCell = 0; iCell < headers[row].length; iCell++){
+          let cell = headers[row][iCell];
           cell.rowspan = 1 + rowCount - cell.depth - row;
           cell.rowspan = cell.depth == 1 ? rowCount - row : 1;
           cell.isLastRow = row + cell.rowspan === rowCount;
           if (cell.isLastRow) {
             cell.width = this.columnWidths[cell.column];
-            columnDetails.set(cell.column - 1, cell);
+            columnDetails[cell.column - 1] = cell;
           }
-        });
+        }
       }
-      const sortedMap = new Map([...columnDetails.entries()].sort());
-      this.$emit("columnDetails", [...sortedMap.values()]);
+      let result = []
+      Object.keys(columnDetails).sort().forEach( key => {
+        result.push(columnDetails[key])
+      });
+      this.$emit("columnDetails", result);
       return headers;
     },
     rowCount() {
@@ -78,7 +82,8 @@ export default {
   },
   methods: {
     getHeaderRow(header, row, column, result) {
-      header.forEach(h => {
+      for(var iHeader = 0; iHeader<header.length; iHeader++){
+        let h = header[iHeader]
         if (!result.hasOwnProperty(row)) {
           result[row] = [];
         }
@@ -95,7 +100,7 @@ export default {
           this.getHeaderRow(h.children, row + 1, column, result);
         }
         column += colspan;
-      });
+      }
     },
     depthOf(header) {
       let depth = 1;
