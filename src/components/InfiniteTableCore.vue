@@ -10,7 +10,7 @@
       @focus="checkIsTableActive"
       @blur="checkIsTableActive"
     >
-      <div v-if="computedHeaders !== false" style="display:flex;border-bottom:1px solid #e0e0e0;">
+      <div v-if="computedHeaders !== false" style="display:flex;">
         <div :style="'width:'+(1+this.rowNumberWidth)+'px;'" />
         <InfiniteTableHeaders
           :headers="computedHeaders"
@@ -42,7 +42,7 @@
                 >
                   {{row}}
                   <div
-                    v-if="isTableActive && row >= selectedRows.start && row <= selectedRows.end"
+                    v-if="selectable && isTableActive && row >= selectedRows.start && row <= selectedRows.end"
                     class="row-number-overlay"
                   />
                 </div>
@@ -67,7 +67,7 @@
                     <input
                       v-if="value.type === 'boolean'"
                       type="checkbox"
-                      :disabled="value.disabled"
+                      :disabled="value.disabled || !editable"
                       tabindex="-1"
                       @mousedown.stop
                       :checked="value.value"
@@ -141,9 +141,9 @@ const MAX_ROWS = 100000;
 const clamp = (value, min, max) =>
   value < min ? min : value > max ? max : value;
 
-function CellReference() {
-  this.R = 0;
-  this.C = 0;
+function CellReference(R, C) {
+  this.R = R;
+  this.C = C;
 }
 
 export default {
@@ -196,26 +196,21 @@ export default {
       topBufferHeight: 0,
       isEditing: false,
       isDeepEditing: false,
-      isSelectable: true,
-      isEditable: true,
       inputValue: "",
       isEndKeyPressed: false,
-      active: new CellReference(),
+      active: new CellReference(0, 0),
       selection: {
-        start: new CellReference(),
-        end: new CellReference()
+        start: new CellReference(0, 0),
+        end: new CellReference(0, 0)
       },
       isBusy: "",
       isTableActive: false
     };
   },
-  created() {
-    this.isEditable = this.editable;
-    this.isSelectable = this.selectable || this.editable;
-  },
   methods: {
     checkIsTableActive() {
-      this.isTableActive = this.$el.contains(document.activeElement);
+      this.isTableActive =
+        this.selectable && this.$el.contains(document.activeElement);
     },
     unselectNative() {
       if (document.activeElement == this.$refs.tableContainer) {
@@ -228,7 +223,7 @@ export default {
     columnWidth(column) {
       return this.columnDetails[column]
         ? this.columnDetails[column].width
-        : this.rowNumberWidth + 1;
+        : 100;
     },
     getCellValue(row, column) {
       let value = {};
@@ -333,19 +328,27 @@ export default {
             this.selectAll();
             return;
           case "x":
-            this.emitEvent("cut", this.selectedRange, "Cutting...");
+            if (this.editable) {
+              this.emitEvent("cut", this.selectedRange, "Cutting...");
+            }
             return;
           case "c":
             this.emitEvent("copy", this.selectedRange, "Copying...");
             return;
           case "v":
-            this.emitEvent("paste", this.selectedRange, "Pasting...");
+            if (this.editable) {
+              this.emitEvent("paste", this.selectedRange, "Pasting...");
+            }
             return;
           case "y":
-            this.emitEvent("redo", this.selectedRange, "Redoing...");
+            if (this.editable) {
+              this.emitEvent("redo", this.selectedRange, "Redoing...");
+            }
             return;
           case "z":
-            this.emitEvent("undo", this.selectedRange, "Undoing...");
+            if (this.editable) {
+              this.emitEvent("undo", this.selectedRange, "Undoing...");
+            }
             return;
         }
       }
@@ -565,7 +568,7 @@ export default {
       );
     },
     selectColumns(columns) {
-      if (this.isAdjustingColumnWidths) {
+      if (this.isAdjustingColumnWidths || !this.selectable) {
         return;
       }
       this.active.R = 0;
@@ -633,6 +636,7 @@ export default {
         }
       }
 
+      if (!this.selectable) return;
       if (cell.C == -1) {
         this.selection.start.C = 0;
         this.selection.end.C = this.columnCount - 1;
@@ -651,7 +655,11 @@ export default {
       }
     },
     onCellMouseOver(cell, event) {
-      if (!this.isAdjustingColumnWidths && event.buttons == 1) {
+      if (
+        this.selectable &&
+        !this.isAdjustingColumnWidths &&
+        event.buttons == 1
+      ) {
         if (cell.C >= 0) {
           this.selection.end.C = cell.C;
         }
@@ -674,14 +682,14 @@ export default {
       this.active.R = clamp(iRow, 0, this.rowCount - 1);
     },
     OnDelete() {
-      if (this.isEditable) {
+      if (this.editable) {
         this.setRangeValue(this.selectedRange, null);
       }
     },
     startEdit(resetValue) {
-      if (!this.isEditable) return;
+      if (!this.editable) return;
       let cell = this.getCellValue(this.active.R, this.active.C);
-      if (cell.type === "boolean" || cell.type === "button") {
+      if (cell.disabled || cell.type === "boolean" || cell.type === "button") {
         return;
       }
       this.inputValue = resetValue ? "" : cell.value;
@@ -714,8 +722,12 @@ export default {
     tableRowHeaderStyle(row) {
       return {
         rowId: true,
-        active: row >= this.selectedRows.start && row <= this.selectedRows.end,
-        selected: this.isTableActive && this.allColumnsSelected
+        active:
+          this.selectable &&
+          row >= this.selectedRows.start &&
+          row <= this.selectedRows.end,
+        selected:
+          this.selectable && this.isTableActive && this.allColumnsSelected
       };
     },
     rowStartY(row) {
@@ -725,7 +737,7 @@ export default {
       return ROW_HEIGHT * (row + 1);
     },
     columnStartX(column) {
-      let start = this.rowNumberWidth;
+      let start = this.computedHeaders === false ? 0 : this.rowNumberWidth;
       for (var columnIndex = 0; columnIndex < column; ++columnIndex) {
         start += this.columnWidth(columnIndex);
       }
@@ -773,10 +785,10 @@ export default {
       };
     },
     selectedRange() {
-      if (!this.isSelectable) {
+      if (!this.selectable) {
         return {
-          start: new CellReference(),
-          end: new CellReference()
+          start: new CellReference(-1, -1),
+          end: new CellReference(-1, -1)
         };
       }
       return {
@@ -859,16 +871,14 @@ export default {
     tableBodyInnerStyle() {
       return {
         height: this.totalHeight + "px",
-        //width: this.totalWidth + "px",
-        position: "relative"
+        position: "relative",
+        cursor: this.selectable ? "cell" : "default"
       };
     },
     tableBodyVisibleStyle() {
       return {
         position: "relative",
-        top: this.topBufferHeight + "px",
-        width: "100%",
-        tableLayout: "fixed"
+        top: this.topBufferHeight + "px"
       };
     }
   }
@@ -908,11 +918,10 @@ export default {
   transition: all 1s;
 }
 .table-body {
+  overflow-x: hidden;
   overflow-y: auto;
-  cursor: cell;
   flex: 1;
   border: 1px solid #e0e0e0;
-  border-top: none;
 }
 .table-row {
   box-sizing: border-box;

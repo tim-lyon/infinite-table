@@ -75,7 +75,7 @@ export default {
         {
           name: "Text field inputs",
           children: [
-            { name: "String", type: "string" },
+            { name: "String", type: "string", disabled: true },
             { name: "Numeric", type: "number" }
           ]
         },
@@ -122,7 +122,7 @@ export default {
       return this.editOption === "edit";
     },
     selectable() {
-      return this.editOption !== "none";
+      return this.editOption !== "neither";
     }
   },
   methods: {

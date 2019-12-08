@@ -1,6 +1,12 @@
 <template>
   <div class="root-element">
-    <InfiniteTableWrapper v-if="useWrapper" v-model="value" />
+    <InfiniteTableWrapper
+      v-if="useWrapper"
+      v-model="value"
+      :headers="headers"
+      :editable="editable"
+      :selectable="selectable"
+    />
     <InfiniteTableCore
       v-else
       :headers="headers"

@@ -68,7 +68,9 @@ export default {
         ) {
           let value = this.value[row][column];
           if (typeof value === "object" && value !== null) {
-            value.value = payload.value;
+            if (value.type != "button") {
+              value.value = payload.value;
+            }
           } else {
             this.$set(this.value[row], column, payload.value);
           }
