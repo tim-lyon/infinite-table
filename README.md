@@ -1,6 +1,8 @@
 # infinite-table
 A high performance, virtual scrolling, lazy loading, editable data table of unlimited length. Currently implemented as a Vue component.
 
+[Live demo](https://tim-lyon.github.io/infinite-table/)
+
 ## Installation
 
 ```
@@ -14,11 +16,11 @@ import InfiniteTable from '@infinite-table/vue'
 ```
 For basic usage you can bind a 2D array of [field values](#fieldValues) to the `infinite-table` component
 ```html
-<InfiniteTable v-model="myData"/>
+<infinite-table v-model="myData"></infinite-table>
 ```
 Alternatively, we can provide a function to get the field values and subscribe to the table's events for updates. When the size of the table gets very large, this approach can help maintain high performing table by only keeping the visible data in memory.
 ```html
-<InfiniteTable :get="myDataGetter"/>
+<infinite-table :get="myDataGetter"></infinite-table>
 ```
 In this example `myDataGetter` would need to be a function that is called with two arguments - the row and column index of the cell.
 
@@ -34,14 +36,14 @@ The `headers` prop allows column headers (and their associated cell's attributes
 <infinite-table />
 
 <!-- custom headers -->
-<infinite-table :headers="myHeaders" />
+<infinite-table :headers="myHeaders"></infinite-table>
 
 <!-- no headers -->
-<infinite-table :headers="false" />
+<infinite-table :headers="false"></infinite-table>
 ```
 Where `myHeaders` is an array of header objects with properties as below.
 |Property|Type|Default|
-|---|---|---|---|
+|---|---|---|
 |`name`|String|Alphabetical (A, B, C etc)
 |`type`|String|`"string"` (see [Supported types](#SupportedTypes))
 |`width`|Number|`6` (em)
