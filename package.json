@@ -1,6 +1,6 @@
 {
   "name": "@infinite-table/vue",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0-beta.4",
   "description": "A high performace, editable data table of unlimited length",
   "private": false,
   "license": "MIT",
